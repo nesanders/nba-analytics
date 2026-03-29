@@ -47,6 +47,8 @@ SQLITE_TABLES = [
     "team",               # team reference
     "team_details",       # team details
     "officials",          # game officials
+    "play_by_play",       # 13.5M rows — ~500MB parquet, skip if memory-constrained
+    "inactive_players",   # players inactive per game
 ]
 
 # Season range for nba_api pulls (format: "1996-97")

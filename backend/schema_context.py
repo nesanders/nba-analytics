@@ -100,6 +100,14 @@ You have access to an NBA database with the following tables (DuckDB SQL syntax)
 **officials** — game officials
   game_id, official_id, first_name, last_name, jersey_num
 
+**play_by_play** — every play for every game, 1946-present (13.5M rows — use WHERE game_id = ... or LIMIT aggressively)
+  game_id, eventnum, eventmsgtype, eventmsgactiontype, period,
+  pctimestring, homedescription, visitordescription, neutraldescription,
+  score, scoremargin,
+  player1_id, player1_name, player1_team_abbreviation,
+  player2_id, player2_name, player2_team_abbreviation,
+  player3_id, player3_name, player3_team_abbreviation
+
 ---
 
 JOIN KEYS:
@@ -136,6 +144,7 @@ NOTES:
 - For shot charts: use the /shot_chart endpoint with player_id and season params — no SQL needed.
 - Always LIMIT results to 100 rows unless the user asks for more.
 - NEVER reference a column from a table that is not in the FROM or JOIN clause.
+- play_by_play has 13.5M rows — always filter by game_id or use aggressive aggregation; never SELECT * without a WHERE clause.
 - Always filter for minimum playing time to avoid statistical noise:
   - Per-season stats: AND GP >= 10 AND MIN >= 10
   - Career/aggregate queries: HAVING SUM(GP) >= 100 (or >= 50 for first-N-season queries)

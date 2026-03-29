@@ -38,7 +38,7 @@ FastAPI (Python)                          Google Cloud Run (scale-to-zero)
 | Concern | Decision |
 |---|---|
 | LLM API key | User supplies their own free Groq key; stored in `localStorage`, never on server |
-| Data queries | DuckDB reads Parquet files downloaded from GCS at startup (~1 s) |
+| Data queries | DuckDB reads Parquet files directly from GCS via httpfs (HMAC auth); no download at startup |
 | Text accuracy | Two-stage LLM: stage 1 generates SQL, stage 2 writes response text from actual results |
 | Chart rendering | Plotly.js, figure spec built server-side and passed as JSON |
 | Shot charts | Fetched on-demand from `stats.nba.com` via `nba_api`; not pre-cached |
@@ -62,7 +62,7 @@ Data comes from two sources:
 
 | Source | Tables | Coverage |
 |---|---|---|
-| [wyattowalsh/basketball](https://www.kaggle.com/datasets/wyattowalsh/basketball) (Kaggle) | `game`, `player`, `common_player_info`, `draft_history`, `line_score`, `other_stats`, `game_info`, `game_summary`, `team`, `officials` | Team box scores 1946–present; player metadata |
+| [wyattowalsh/basketball](https://www.kaggle.com/datasets/wyattowalsh/basketball) (Kaggle) | `game`, `player`, `common_player_info`, `draft_history`, `line_score`, `other_stats`, `game_info`, `game_summary`, `team`, `officials`, `play_by_play`, `inactive_players` | Team box scores and play-by-play 1946–present; player metadata |
 | NBA Stats API (`nba_api`) | `player_season_stats`, `player_season_stats_advanced`, `team_season_stats`, `team_season_stats_advanced`, `player_game_logs` | **1996-97 to present only** |
 
 The daily Cloud Scheduler job refreshes the current season's stats after each game day
@@ -84,8 +84,9 @@ The daily Cloud Scheduler job refreshes the current season's stats after each ga
   `stats.nba.com` in real time. If the NBA API is slow or rate-limits the request,
   shot chart queries will be slow or fail.
 
-- **No play-by-play data.** The source dataset has 13M+ play-by-play rows; this table
-  is excluded from the initial load due to size. It can be added with filtering.
+- **Play-by-play queries can be slow.** The table has 13.5M rows read via httpfs from
+  GCS. The LLM is instructed to always filter by `game_id`; open-ended aggregations
+  over the full table will be slow.
 
 - **LLM SQL accuracy.** Complex multi-table queries or ambiguous questions may produce
   incorrect SQL. The generated SQL is always shown so you can verify it.
@@ -149,8 +150,7 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
 - [ ] **Historical player game logs** — load all seasons, not just recent 5
 - [ ] **Shot chart caching** — pre-fetch and store popular player/season shot data in GCS
       so the first request isn't slow
-- [ ] **Play-by-play** — load a filtered/sampled subset (e.g. last 3 seasons) to enable
-      clutch stats, lineup analysis, etc.
+- [ ] **Play-by-play aggregations** — pre-aggregate clutch stats, lineup stats, etc.
+      into summary Parquet files so common queries don't scan all 13.5M rows
 - [ ] **Better SQL error recovery** — retry with a corrected prompt when SQL fails
 - [ ] **Rate limiting** — add basic rate limiting on the Cloud Run endpoint
-- [ ] **streamsim site** — investigate GitHub Pages routing conflict with `nsanders.me`
