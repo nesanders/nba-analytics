@@ -68,9 +68,9 @@ def _data_footnote(df: pd.DataFrame) -> str:
             first = min(valid)
             last = max(valid)
             end_year = int(last[:4]) + 1
-            return f"Data: {first[:4]}–{end_year} · Source: NBA Stats API / Kaggle"
+            return f"Data: {first[:4]}–{end_year} · Source: NBA Stats API"
     # Fallback: player/team season stats coverage
-    return "Player/team season stats: 1996–2025 · Game records: 1946–2025 · Source: NBA Stats API / Kaggle"
+    return "Player/team season stats: 1996–2025 · Game records: 1946–2025"
 
 
 

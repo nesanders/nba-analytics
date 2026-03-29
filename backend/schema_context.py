@@ -161,6 +161,19 @@ NOTES:
   )
   SELECT ... FROM ranked WHERE season_rank <= N GROUP BY PLAYER_NAME HAVING SUM(GP) >= 50
 - Per-36 calculations must weight by games: SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36
+- For age-matched comparisons ("compare X and Y by age", "matched on age"): use age as the
+  x-axis, NOT season. Compute age per row as:
+    CAST(LEFT(s.season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE)) AS age
+  Then GROUP BY s.PLAYER_NAME, age and use x="age" in the chart spec.
+  Example:
+    SELECT s.PLAYER_NAME,
+           CAST(LEFT(s.season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE)) AS age,
+           AVG(s.PTS) AS avg_pts
+    FROM player_season_stats s
+    JOIN common_player_info c ON s.PLAYER_ID = CAST(c.person_id AS VARCHAR)
+    WHERE s.PLAYER_NAME IN ('LeBron James', 'Stephen Curry') AND s.GP >= 10
+    GROUP BY s.PLAYER_NAME, age
+    ORDER BY age
 """
 
 
@@ -200,5 +213,6 @@ Rules:
   Wrong: SELECT a.PLAYER_NAME FROM (SELECT PLAYER_ID, SUM(MIN) FROM ...) a  ← PLAYER_NAME not in subquery
   Right: Avoid subqueries for age+aggregation — use a direct JOIN with GROUP BY instead (see example above).
 - For per-36 calculations: pts_per36 = SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36
-- To get a player's age in a given season: CAST(LEFT(season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE))
+- To get a player's age in a given season: CAST(LEFT(s.season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE))
+  (requires JOIN common_player_info c ON s.PLAYER_ID = CAST(c.person_id AS VARCHAR))
 """

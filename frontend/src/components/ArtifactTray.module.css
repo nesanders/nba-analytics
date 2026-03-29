@@ -51,6 +51,8 @@
   opacity: 0.4;
 }
 
+/* flex-shrink:0 prevents cards from being squashed;
+   the list scrolls instead. */
 .list {
   flex: 1;
   min-height: 0;
@@ -62,6 +64,7 @@
 }
 
 .card {
+  flex-shrink: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -72,6 +75,16 @@
 
 .card:target {
   border-color: var(--accent);
+}
+
+@keyframes flashHighlight {
+  0%   { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,93,4,0.4); }
+  70%  { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,93,4,0.15); }
+  100% { border-color: var(--border); box-shadow: none; }
+}
+
+.highlighted {
+  animation: flashHighlight 1.5s ease-out forwards;
 }
 
 .cardHeader {
@@ -170,7 +183,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   width: 100%;
-  max-width: 900px;
+  max-width: 940px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;

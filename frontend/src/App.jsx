@@ -15,7 +15,10 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [artifacts, setArtifacts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [focusedArtifactId, setFocusedArtifactId] = useState(null)
+  const [highlightedArtifactId, setHighlightedArtifactId] = useState(null)
   const artifactCounter = useRef(0)
+  const highlightTimer = useRef(null)
 
   const handleKeySet = useCallback((key) => {
     localStorage.setItem('groq_key', key)
@@ -27,9 +30,19 @@ export default function App() {
     setGroqKey('')
   }, [])
 
+  // Called when the user clicks "↗ Artifact #N" in a chat bubble.
+  // Scrolls the tray card into view, flashes it, and opens the overlay.
   const handleArtifactClick = useCallback((artifactId) => {
     document.getElementById(`artifact-${artifactId}`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+
+    // Flash highlight for 1.5s
+    clearTimeout(highlightTimer.current)
+    setHighlightedArtifactId(artifactId)
+    highlightTimer.current = setTimeout(() => setHighlightedArtifactId(null), 1500)
+
+    // Open overlay
+    setFocusedArtifactId(artifactId)
   }, [])
 
   const handleSend = useCallback(async (text) => {
@@ -37,7 +50,6 @@ export default function App() {
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
 
-    // History for the API: exclude figures (send only text content)
     const history = messages.map(m => ({ role: m.role, content: m.content }))
 
     try {
@@ -61,9 +73,7 @@ export default function App() {
         artifactId,
       }])
     } catch (err) {
-      if (err.message === 'invalid_key') {
-        handleClearKey()
-      }
+      if (err.message === 'invalid_key') handleClearKey()
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: err.message === 'invalid_key'
@@ -76,9 +86,7 @@ export default function App() {
     }
   }, [messages, groqKey, handleClearKey])
 
-  if (!groqKey) {
-    return <ApiKeyModal onKeySet={handleKeySet} />
-  }
+  if (!groqKey) return <ApiKeyModal onKeySet={handleKeySet} />
 
   return (
     <div className={styles.app}>
@@ -99,7 +107,12 @@ export default function App() {
           <ChatInput onSend={handleSend} disabled={loading} />
         </div>
         <div className={styles.artifactPanel}>
-          <ArtifactTray artifacts={artifacts} />
+          <ArtifactTray
+            artifacts={artifacts}
+            focusedArtifactId={focusedArtifactId}
+            highlightedArtifactId={highlightedArtifactId}
+            onFocusChange={setFocusedArtifactId}
+          />
         </div>
       </div>
     </div>
