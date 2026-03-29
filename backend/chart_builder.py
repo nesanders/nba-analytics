@@ -73,14 +73,6 @@ def _data_footnote(df: pd.DataFrame) -> str:
     return "Player/team season stats: 1996–2025 · Game records: 1946–2025 · Source: NBA Stats API / Kaggle"
 
 
-_FOOTNOTE_STYLE = dict(
-    xref="paper", yref="paper",
-    x=0.5, y=-0.12,
-    xanchor="center", yanchor="top",
-    text="",          # filled in per chart
-    showarrow=False,
-    font=dict(size=10, color="#666688"),
-)
 
 
 def build_figure(rows: Rows, spec: ChartSpec) -> dict | None:
@@ -117,15 +109,18 @@ def build_figure(rows: Rows, spec: ChartSpec) -> dict | None:
 
 def _layout(spec: ChartSpec, df: pd.DataFrame | None = None, **overrides) -> dict:
     y_spec = spec.get("y")
-    footnote = {**_FOOTNOTE_STYLE, "text": _data_footnote(df) if df is not None else ""}
+    title_text = spec.get("title", "")
+    if df is not None:
+        note = _data_footnote(df)
+        # Embed footnote as a subtitle line so it's never clipped by margins
+        title_text = f"{title_text}<br><sup style='color:#666688'>{note}</sup>"
     return {
-        "title": {"text": spec.get("title", ""), "x": 0.5},
+        "title": {"text": title_text, "x": 0.5},
         "template": PLOTLY_TEMPLATE,
         "height": DEFAULT_HEIGHT,
-        "margin": {"l": 50, "r": 20, "t": 50, "b": 70},
+        "margin": {"l": 50, "r": 20, "t": 65, "b": 50},
         "xaxis": {"title": _pretty_label(spec.get("x") or "")},
         "yaxis": {"title": _pretty_label(y_spec) if isinstance(y_spec, str) else ""},
-        "annotations": [footnote],
         **overrides,
     }
 
@@ -196,7 +191,7 @@ def _bar(df: pd.DataFrame, spec: ChartSpec) -> dict:
         y_spec = spec.get("y")
         layout = _layout(spec, df, barmode="group",
                          height=height,
-                         margin={"l": 160, "r": 20, "t": 50, "b": 70},
+                         margin={"l": 160, "r": 20, "t": 65, "b": 50},
                          yaxis={"title": "", "autorange": "reversed"},
                          xaxis={"title": _pretty_label(y_spec) if isinstance(y_spec, str) else ""})
     else:
