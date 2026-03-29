@@ -1,6 +1,15 @@
 """
-Curated schema context injected into the LLM system prompt.
-Keep this concise — it's sent with every request.
+LLM system prompt and schema context.
+
+SCHEMA_CONTEXT documents every queryable table — column names, data types,
+coverage dates, join keys, and worked examples. This is prepended to every
+Groq request so the model knows exactly what SQL it can write.
+
+SYSTEM_PROMPT wraps the schema with instructions for the response JSON format
+and SQL correctness rules (minimum GP filters, per-36 formula, JOIN discipline).
+
+Keep this file concise: it is sent with every request and counts against the
+context window. Avoid redundancy and prune stale guidance promptly.
 """
 
 SCHEMA_CONTEXT = """

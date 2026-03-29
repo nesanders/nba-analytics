@@ -1,3 +1,5 @@
+// Text input bar at the bottom of the chat. Submits on Enter (Shift+Enter
+// inserts a newline). Disabled while a response is in flight.
 import { useState, useRef } from 'react'
 import styles from './ChatInput.module.css'
 

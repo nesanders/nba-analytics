@@ -1,3 +1,10 @@
+"""
+FastAPI application entry point.
+
+Configures CORS (locked to ALLOWED_ORIGIN env var), registers the /chat and
+/shot_chart routers, and initialises the DuckDB connection at startup via the
+lifespan context. The /health endpoint is used by Cloud Run for readiness checks.
+"""
 import os
 from contextlib import asynccontextmanager
 

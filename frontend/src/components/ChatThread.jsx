@@ -1,3 +1,6 @@
+// Scrollable message list. Shows example prompts when empty.
+// Auto-scrolls to the bottom on new messages and while the loading indicator
+// is visible.
 import { useEffect, useRef } from 'react'
 import Message from './Message.jsx'
 import styles from './ChatThread.module.css'

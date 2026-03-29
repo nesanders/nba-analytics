@@ -1,3 +1,6 @@
+// Full-screen modal shown on first visit or after key rejection.
+// Validates that the key starts with "gsk_" client-side, then calls onKeySet
+// which persists it to localStorage. The key is never sent to our servers.
 import { useState } from 'react'
 import styles from './ApiKeyModal.module.css'
 

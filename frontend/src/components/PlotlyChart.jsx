@@ -1,3 +1,6 @@
+// Thin wrapper around Plotly.react(). Lazily imports plotly.js-dist-min on
+// first render to avoid blocking the initial page load. Calls Plotly.react
+// (not Plotly.newPlot) so React re-renders update the chart in place.
 import { useEffect, useRef } from 'react'
 
 // Load Plotly from CDN-style import via the dist min bundle

@@ -1,3 +1,17 @@
+"""
+POST /chat endpoint — the core request/response loop.
+
+Two-stage LLM flow:
+  Stage 1: Send user message + conversation history to Groq (llama-3.3-70b).
+           The model returns JSON with {sql, chart, text}. Only sql and chart
+           are used from this response.
+  Stage 2: Execute the SQL against DuckDB. Pass the top rows back to the LLM
+           in a second short call to generate response text grounded in the
+           actual data rather than training-time knowledge.
+
+The Groq API key is supplied by the user via the X-Groq-Key request header and
+is never stored server-side.
+"""
 import json
 import os
 import re

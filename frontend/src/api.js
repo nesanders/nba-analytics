@@ -1,3 +1,6 @@
+// Fetch wrapper for the backend API.
+// Injects the X-Groq-Key header on every request; throws 'invalid_key' on 401
+// so the app can clear the stored key and show the modal again.
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 export async function sendChat(message, history, groqKey) {

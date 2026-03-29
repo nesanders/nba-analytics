@@ -1,3 +1,6 @@
+// Root component. Manages the Groq API key (localStorage), the conversation
+// message list, and the loading state. Renders the ApiKeyModal on first visit
+// or after a 401, and the chat UI once a key is present.
 import { useState, useCallback } from 'react'
 import ApiKeyModal from './components/ApiKeyModal.jsx'
 import ChatThread from './components/ChatThread.jsx'

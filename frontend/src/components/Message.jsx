@@ -1,3 +1,6 @@
+// Single chat bubble. Renders text, an optional Plotly chart, and a
+// collapsible "Show SQL" section. User messages are right-aligned;
+// assistant messages are left-aligned.
 import { useState } from 'react'
 import PlotlyChart from './PlotlyChart.jsx'
 import styles from './Message.module.css'
