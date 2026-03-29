@@ -119,14 +119,20 @@ JOIN KEYS:
 - draft_history.person_id = common_player_info.person_id
 
 EXAMPLE JOINS:
--- Age-based filter (birthdate lives in common_player_info, not player_season_stats):
-SELECT s.PLAYER_NAME, AVG(s.PTS) as avg_pts
+-- Per-36 scoring through age 28, minimum 2000 minutes — DO NOT use a subquery:
+-- Join once, filter in WHERE, aggregate in the same GROUP BY. Never wrap in a
+-- subquery and then reference a column (like PLAYER_NAME) that wasn't in the subquery.
+SELECT s.PLAYER_NAME,
+       SUM(s.PTS * s.GP) / NULLIF(SUM(s.MIN * s.GP), 0) * 36 AS pts_per36,
+       SUM(s.MIN * s.GP) AS total_min
 FROM player_season_stats s
 JOIN common_player_info c ON s.PLAYER_ID = CAST(c.person_id AS VARCHAR)
 WHERE CAST(LEFT(s.season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE)) <= 28
-GROUP BY s.PLAYER_NAME ORDER BY avg_pts DESC LIMIT 10
+GROUP BY s.PLAYER_NAME
+HAVING SUM(s.MIN * s.GP) >= 2000
+ORDER BY pts_per36 DESC LIMIT 10
 
--- Per-36 scoring (aggregate across seasons then normalize):
+-- Per-36 scoring (aggregate across all seasons):
 SELECT PLAYER_NAME,
        SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36 AS pts_per36
 FROM player_season_stats
@@ -189,6 +195,9 @@ Rules:
 - CRITICAL: Every column referenced in WHERE, HAVING, SELECT must come from a table in the FROM/JOIN clause.
   Wrong: SELECT ... FROM player_season_stats HAVING birthdate IS NOT NULL  ← birthdate not in scope
   Right: SELECT ... FROM player_season_stats JOIN common_player_info c ON ... WHERE c.birthdate IS NOT NULL
+- CRITICAL: When using a subquery, only columns included in the subquery's SELECT are accessible outside it.
+  Wrong: SELECT a.PLAYER_NAME FROM (SELECT PLAYER_ID, SUM(MIN) FROM ...) a  ← PLAYER_NAME not in subquery
+  Right: Avoid subqueries for age+aggregation — use a direct JOIN with GROUP BY instead (see example above).
 - For per-36 calculations: pts_per36 = SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36
 - To get a player's age in a given season: CAST(LEFT(season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE))
 """
