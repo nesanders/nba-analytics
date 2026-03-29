@@ -93,14 +93,50 @@ You have access to an NBA database with the following tables (DuckDB SQL syntax)
 
 ---
 
+JOIN KEYS:
+- player_season_stats.PLAYER_ID = common_player_info.person_id  (join for birthdate, position, draft info)
+- player_season_stats.PLAYER_ID = player.id                     (join for full_name, is_active)
+- player_season_stats.PLAYER_ID = player_game_logs.PLAYER_ID    (join season stats to game logs)
+- game.game_id = line_score.game_id = game_summary.game_id = officials.game_id = other_stats.game_id
+- player_game_logs.GAME_ID = game.game_id                       (join player logs to game metadata)
+- draft_history.person_id = common_player_info.person_id
+
+EXAMPLE JOINS:
+-- Age-based filter (birthdate lives in common_player_info, not player_season_stats):
+SELECT s.PLAYER_NAME, AVG(s.PTS) as avg_pts
+FROM player_season_stats s
+JOIN common_player_info c ON s.PLAYER_ID = CAST(c.person_id AS VARCHAR)
+WHERE CAST(LEFT(s.season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE)) <= 28
+GROUP BY s.PLAYER_NAME ORDER BY avg_pts DESC LIMIT 10
+
+-- Per-36 scoring (aggregate across seasons then normalize):
+SELECT PLAYER_NAME,
+       SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36 AS pts_per36
+FROM player_season_stats
+GROUP BY PLAYER_NAME HAVING SUM(GP) >= 100
+ORDER BY pts_per36 DESC LIMIT 10
+
 NOTES:
 - player_season_stats and player_season_stats_advanced use column names in UPPERCASE.
 - game table uses lowercase column names.
-- Season format: '2003-04' (string), '20030' or '20033' (season_id in game table where last digit = season type: 1=preseason, 2=regular, 3=all-star, 4=playoffs, 5=in-season tournament).
+- Season format: '2003-04' (string). LEFT(season, 4) extracts the start year as text.
 - To filter regular season in the game table: season_type = 'Regular Season'
 - Player names in player_season_stats: use PLAYER_NAME (e.g. 'LeBron James').
+- birthdate in common_player_info is a string/TIMESTAMP — use TRY_CAST(birthdate AS DATE) to be safe.
+- player_season_stats.PLAYER_ID is VARCHAR; common_player_info.person_id may need CAST to match.
 - For shot charts: use the /shot_chart endpoint with player_id and season params — no SQL needed.
 - Always LIMIT results to 100 rows unless the user asks for more.
+- NEVER reference a column from a table that is not in the FROM or JOIN clause.
+- Always filter for minimum playing time to avoid statistical noise:
+  - Per-season stats: AND GP >= 10 AND MIN >= 10
+  - Career/aggregate queries: HAVING SUM(GP) >= 100 (or >= 50 for first-N-season queries)
+- For "first N seasons of a player's career", rank each player's seasons by season string:
+  WITH ranked AS (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY PLAYER_ID ORDER BY season) AS season_rank
+    FROM player_season_stats WHERE GP >= 10
+  )
+  SELECT ... FROM ranked WHERE season_rank <= N GROUP BY PLAYER_NAME HAVING SUM(GP) >= 50
+- Per-36 calculations must weight by games: SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36
 """
 
 
@@ -132,4 +168,9 @@ Rules:
 - If the question is purely conversational (no data needed), set sql and chart to null.
 - Never include markdown, code fences, or explanation outside the JSON.
 - The "text" field should be a complete, standalone answer a user can read without seeing the chart.
+- CRITICAL: Every column referenced in WHERE, HAVING, SELECT must come from a table in the FROM/JOIN clause.
+  Wrong: SELECT ... FROM player_season_stats HAVING birthdate IS NOT NULL  ← birthdate not in scope
+  Right: SELECT ... FROM player_season_stats JOIN common_player_info c ON ... WHERE c.birthdate IS NOT NULL
+- For per-36 calculations: pts_per36 = SUM(PTS * GP) / NULLIF(SUM(MIN * GP), 0) * 36
+- To get a player's age in a given season: CAST(LEFT(season, 4) AS INT) - YEAR(TRY_CAST(c.birthdate AS DATE))
 """

@@ -88,15 +88,48 @@ def _resolve_columns(df: pd.DataFrame, spec: ChartSpec) -> tuple[str | None, lis
 def _bar(df: pd.DataFrame, spec: ChartSpec) -> dict:
     x, y_cols = _resolve_columns(df, spec)
     color_col = spec.get("color")
+
+    # Use horizontal bars when x-axis has string labels (names) to avoid cutoff
+    use_horizontal = x and df[x].dtype == object and len(df) >= 5
+
     data = []
     if color_col and color_col in df.columns:
         for group, gdf in df.groupby(color_col):
             for y_col in y_cols:
-                data.append({"type": "bar", "name": str(group), "x": gdf[x].tolist(), "y": gdf[y_col].tolist()})
+                trace = {"type": "bar", "name": str(group)}
+                if use_horizontal:
+                    trace["y"] = gdf[x].tolist()
+                    trace["x"] = gdf[y_col].tolist()
+                    trace["orientation"] = "h"
+                else:
+                    trace["x"] = gdf[x].tolist()
+                    trace["y"] = gdf[y_col].tolist()
+                data.append(trace)
     else:
         for y_col in y_cols:
-            data.append({"type": "bar", "name": y_col, "x": df[x].tolist(), "y": df[y_col].tolist()})
-    return {"data": data, "layout": _layout(spec, barmode="group")}
+            trace = {"type": "bar", "name": y_col}
+            if use_horizontal:
+                trace["y"] = df[x].tolist()
+                trace["x"] = df[y_col].tolist()
+                trace["orientation"] = "h"
+            else:
+                trace["x"] = df[x].tolist()
+                trace["y"] = df[y_col].tolist()
+            data.append(trace)
+
+    if use_horizontal:
+        n = len(df)
+        height = max(DEFAULT_HEIGHT, 40 * n + 80)
+        layout = _layout(spec, barmode="group",
+                         height=height,
+                         margin={"l": 160, "r": 20, "t": 50, "b": 40},
+                         yaxis={"title": "", "autorange": "reversed"},
+                         xaxis={"title": spec.get("y", "") if isinstance(spec.get("y"), str) else ""})
+    else:
+        layout = _layout(spec, barmode="group",
+                         xaxis={"title": spec.get("x", ""), "tickangle": -35,
+                                 "automargin": True})
+    return {"data": data, "layout": layout}
 
 
 def _line(df: pd.DataFrame, spec: ChartSpec) -> dict:

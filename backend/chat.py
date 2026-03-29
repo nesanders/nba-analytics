@@ -15,6 +15,7 @@ router = APIRouter()
 
 MAX_HISTORY_TURNS = 10  # keep last N user+assistant pairs
 MAX_ROWS = 500          # hard cap on rows returned to chart builder
+SUMMARIZE_ROWS = 15     # rows shown to LLM for text generation
 
 
 class ChatMessage(BaseModel):
@@ -39,18 +40,17 @@ async def chat(
     req: ChatRequest,
     x_groq_key: str = Header(..., alias="X-Groq-Key"),
 ):
-    groq = Groq(api_key=x_groq_key)
+    groq_client = Groq(api_key=x_groq_key)
 
-    # Build message history (trim to last N turns)
+    # --- Stage 1: Generate SQL + chart spec ---
     history = req.history[-(MAX_HISTORY_TURNS * 2):]
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
     messages.append({"role": "user", "content": req.message})
 
-    # Call Groq
     try:
-        completion = groq.chat.completions.create(
+        completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
             temperature=0.1,
@@ -63,14 +63,13 @@ async def chat(
             raise HTTPException(status_code=401, detail="Invalid Groq API key")
         raise HTTPException(status_code=502, detail=f"Groq API error: {err}")
 
-    raw = completion.choices[0].message.content
-    llm_response = _parse_llm_response(raw)
-
-    text = llm_response.get("text", "")
+    llm_response = _parse_llm_response(completion.choices[0].message.content)
+    fallback_text = llm_response.get("text", "")
     sql = llm_response.get("sql")
     chart_spec = llm_response.get("chart")
 
-    # Execute SQL
+    # --- Execute SQL ---
+    rows = []
     figure = None
     sql_error = None
     if sql:
@@ -83,7 +82,15 @@ async def chat(
                 figure = build_figure(rows, chart_spec)
         except Exception as e:
             sql_error = str(e)
-            text += f"\n\n_(Query failed: {sql_error})_"
+
+    # --- Stage 2: Generate text from actual query results ---
+    if sql and not sql_error and rows:
+        text = _generate_summary(groq_client, req.message, rows)
+    elif sql and sql_error:
+        text = fallback_text + f"\n\n_(Query failed: {sql_error})_"
+    else:
+        # Conversational — LLM text is the answer
+        text = fallback_text
 
     return ChatResponse(
         text=text,
@@ -93,15 +100,44 @@ async def chat(
     )
 
 
+def _generate_summary(
+    groq_client: Groq,
+    question: str,
+    rows: list[dict],
+) -> str:
+    """Make a second lightweight call to generate text grounded in actual query results."""
+    sample = rows[:SUMMARIZE_ROWS]
+    results_text = json.dumps(sample, default=str, indent=None)
+
+    prompt = (
+        f"The user asked: {question}\n\n"
+        f"The database returned these results (first {len(sample)} rows):\n{results_text}\n\n"
+        "Write a concise 1-3 sentence answer grounded in these exact results. "
+        "Name specific players/teams/numbers from the data. Do not guess or use outside knowledge. "
+        "Return plain text only, no JSON."
+    )
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=256,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception:
+        # Fall back to first row summary if the second call fails
+        top = rows[0]
+        keys = list(top.keys())
+        return f"Top result: {', '.join(f'{k}={top[k]}' for k in keys[:4])}"
+
+
 def _parse_llm_response(raw: str) -> dict[str, Any]:
     """Parse the LLM JSON response, with fallback for malformed output."""
-    # Strip markdown code fences if the model disobeyed instructions
     raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
     raw = re.sub(r"\s*```$", "", raw)
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        # Best-effort: extract text field at minimum
         text_match = re.search(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
         return {"text": text_match.group(1) if text_match else raw, "sql": None, "chart": None}
 
@@ -111,7 +147,6 @@ def _sanitize_sql(sql: str) -> str:
     normalized = sql.strip().upper()
     forbidden = ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE", "REPLACE")
     for kw in forbidden:
-        # Check if keyword appears as a statement start (not inside a string)
         if re.search(rf"\b{kw}\b", normalized):
             raise ValueError(f"SQL contains forbidden keyword: {kw}")
     return sql
