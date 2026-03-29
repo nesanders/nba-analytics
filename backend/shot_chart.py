@@ -10,14 +10,18 @@ from __future__ import annotations
 import time
 from functools import lru_cache
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from nba_api.stats.endpoints import shotchartdetail
+
+from limiter import RATE_LIMIT_SHOT, limiter
 
 router = APIRouter()
 
 
 @router.get("/shot_chart")
+@limiter.limit(RATE_LIMIT_SHOT)
 def shot_chart(
+    request: Request,
     player_id: int = Query(..., description="NBA player ID"),
     season: str = Query(..., description="Season string e.g. '2005-06'"),
     season_type: str = Query("Regular Season", description="Regular Season | Playoffs"),

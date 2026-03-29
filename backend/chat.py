@@ -17,12 +17,13 @@ import os
 import re
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from groq import Groq
 from pydantic import BaseModel
 
 from chart_builder import build_figure
 from db import run_query
+from limiter import RATE_LIMIT_CHAT, limiter
 from schema_context import SYSTEM_PROMPT
 
 router = APIRouter()
@@ -50,7 +51,9 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit(RATE_LIMIT_CHAT)
 async def chat(
+    request: Request,
     req: ChatRequest,
     x_groq_key: str = Header(..., alias="X-Groq-Key"),
 ):
