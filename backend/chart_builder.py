@@ -64,6 +64,13 @@ def _layout(spec: ChartSpec, **overrides) -> dict:
     }
 
 
+def _is_season_col(series: pd.Series) -> bool:
+    """Return True if the column contains NBA season strings like '2009-10'."""
+    import re
+    sample = series.dropna().astype(str).head(5)
+    return all(re.match(r"^\d{4}-\d{2}$", v) for v in sample) if len(sample) > 0 else False
+
+
 def _resolve_columns(df: pd.DataFrame, spec: ChartSpec) -> tuple[str | None, list[str]]:
     """Return (x_col, [y_cols]) resolving against actual dataframe columns."""
     x = spec.get("x")
@@ -153,7 +160,12 @@ def _line(df: pd.DataFrame, spec: ChartSpec) -> dict:
                 "name": y_col,
                 "x": df_sorted[x].tolist(), "y": df_sorted[y_col].tolist(),
             })
-    return {"data": data, "layout": _layout(spec)}
+    # Force categorical axis for season strings (e.g. "2009-10") so Plotly
+    # doesn't misparse them as dates and space them unevenly.
+    xaxis_override = {"title": spec.get("x", "")}
+    if x and _is_season_col(df[x]):
+        xaxis_override["type"] = "category"
+    return {"data": data, "layout": _layout(spec, xaxis=xaxis_override)}
 
 
 def _scatter(df: pd.DataFrame, spec: ChartSpec) -> dict:
