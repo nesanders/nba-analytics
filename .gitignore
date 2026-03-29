@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+*.egg
+
+# Node
+node_modules/
+frontend/dist/
+
+# Env
+.env
+*.env
+
+# Data / local dev artifacts
+*.db
+*.sqlite
+*.parquet
+data/
+
+# Keys / credentials
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
