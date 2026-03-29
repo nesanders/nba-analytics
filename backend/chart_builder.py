@@ -162,9 +162,13 @@ def _line(df: pd.DataFrame, spec: ChartSpec) -> dict:
             })
     # Force categorical axis for season strings (e.g. "2009-10") so Plotly
     # doesn't misparse them as dates and space them unevenly.
+    # Also set categoryorder so multi-series charts (where groupby produces
+    # traces in alphabetical player order) don't append missing seasons to the
+    # end of the axis instead of placing them chronologically.
     xaxis_override = {"title": spec.get("x", "")}
     if x and _is_season_col(df[x]):
         xaxis_override["type"] = "category"
+        xaxis_override["categoryorder"] = "category ascending"
     return {"data": data, "layout": _layout(spec, xaxis=xaxis_override)}
 
 
