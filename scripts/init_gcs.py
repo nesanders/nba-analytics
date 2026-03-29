@@ -186,17 +186,17 @@ def fetch_team_season_stats():
 
 
 def fetch_player_game_logs_recent():
-    """Pull player game logs for recent seasons (last 5) — full history is too large."""
+    """Pull player game logs for all available seasons (1996-97 to present)."""
     from nba_api.stats.endpoints import playergamelogs
 
     print(f"\n{'='*60}")
-    print("Fetching player game logs (recent 5 seasons) via nba_api")
+    print(f"Fetching player game logs ({FIRST_SEASON_YEAR}-97 to {LAST_SEASON_YEAR}-present) via nba_api")
     print(f"{'='*60}")
 
     all_logs = []
-    recent_seasons = [season_str(y) for y in range(LAST_SEASON_YEAR - 4, LAST_SEASON_YEAR + 1)]
+    all_seasons = [season_str(y) for y in range(FIRST_SEASON_YEAR, LAST_SEASON_YEAR + 1)]
 
-    for season in recent_seasons:
+    for season in all_seasons:
         print(f"  {season}...", end=" ", flush=True)
         try:
             logs = playergamelogs.PlayerGameLogs(
