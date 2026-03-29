@@ -48,4 +48,4 @@ jobs:
             --cpu=1 \
             --timeout=60 \
             --service-account=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
-            --set-env-vars="GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},ALLOWED_ORIGIN=${{ vars.ALLOWED_ORIGIN }}"
+            --set-env-vars="GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},ALLOWED_ORIGIN=${{ vars.ALLOWED_ORIGIN }},GCS_HMAC_KEY_ID=${{ secrets.GCS_HMAC_KEY_ID }},GCS_HMAC_SECRET=${{ secrets.GCS_HMAC_SECRET }}"
