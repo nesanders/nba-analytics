@@ -77,8 +77,8 @@ The daily Cloud Scheduler job refreshes the current season's stats after each ga
   scoring average in league history" will miss Wilt Chamberlain, Oscar Robertson, etc.
   Fixing this requires scraping Basketball Reference.
 
-- **Player game logs are recent seasons only** (last 5 seasons). Full historical
-  game-by-game logs for all players would be very large; older seasons are not loaded.
+- **Player game logs cover 1996-97 to present.** Full game-by-game logs for all
+  players are available from the NBA Stats API era. Pre-1996 game logs are not available.
 
 - **Shot charts are on-demand, not cached.** The `/shot_chart` endpoint calls
   `stats.nba.com` in real time. If the NBA API is slow or rate-limits the request,
@@ -147,7 +147,7 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
 ## TODO
 
 - [ ] **Pre-1996 player stats** — scrape Basketball Reference for full historical coverage
-- [ ] **Historical player game logs** — load all seasons, not just recent 5
+- [x] **Historical player game logs** — all seasons 1996-97 to present loaded
 - [ ] **Shot chart caching** — pre-fetch and store popular player/season shot data in GCS
       so the first request isn't slow
 - [ ] **Play-by-play aggregations** — pre-aggregate clutch stats, lineup stats, etc.

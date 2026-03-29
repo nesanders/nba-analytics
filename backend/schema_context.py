@@ -38,7 +38,7 @@ You have access to an NBA database with the following tables (DuckDB SQL syntax)
   PIE,
   season (e.g. '2003-04')
 
-**player_game_logs** — individual game box scores for each player (recent 5 seasons)
+**player_game_logs** — individual game box scores for each player (1996-97 to present)
   PLAYER_ID, PLAYER_NAME, NICKNAME, TEAM_ID, TEAM_ABBREVIATION, TEAM_NAME,
   GAME_ID, GAME_DATE, MATCHUP, WL,
   MIN, FGM, FGA, FG_PCT, FG3M, FG3A, FG3_PCT, FTM, FTA, FT_PCT,
