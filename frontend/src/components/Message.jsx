@@ -1,12 +1,9 @@
-// Single chat bubble. Renders text, an optional Plotly chart, and a
-// collapsible "Show SQL" section. User messages are right-aligned;
-// assistant messages are left-aligned.
-import { useState } from 'react'
-import PlotlyChart from './PlotlyChart.jsx'
+// Single chat bubble. User messages are right-aligned; assistant messages are
+// left-aligned. If the response produced an artifact (chart/SQL), a numbered
+// badge links to it in the artifact tray on the right.
 import styles from './Message.module.css'
 
-export default function Message({ message }) {
-  const [showSql, setShowSql] = useState(false)
+export default function Message({ message, onArtifactClick }) {
   const isUser = message.role === 'user'
 
   return (
@@ -14,24 +11,13 @@ export default function Message({ message }) {
       <div className={`${styles.bubble} ${message.error ? styles.error : ''}`}>
         <p className={styles.text}>{message.content}</p>
 
-        {message.figure && (
-          <div className={styles.chart}>
-            <PlotlyChart figure={message.figure} />
-          </div>
-        )}
-
-        {message.sql && (
-          <div className={styles.sqlSection}>
-            <button
-              className={styles.sqlToggle}
-              onClick={() => setShowSql(v => !v)}
-            >
-              {showSql ? 'Hide SQL' : 'Show SQL'}
-            </button>
-            {showSql && (
-              <pre className={styles.sql}>{message.sql}</pre>
-            )}
-          </div>
+        {message.artifactId != null && (
+          <button
+            className={styles.artifactLink}
+            onClick={() => onArtifactClick(message.artifactId)}
+          >
+            ↗ Artifact #{message.artifactId}
+          </button>
         )}
       </div>
     </div>

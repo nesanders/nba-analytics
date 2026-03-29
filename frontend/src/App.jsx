@@ -1,17 +1,21 @@
 // Root component. Manages the Groq API key (localStorage), the conversation
-// message list, and the loading state. Renders the ApiKeyModal on first visit
-// or after a 401, and the chat UI once a key is present.
-import { useState, useCallback } from 'react'
+// message list, artifact list, and loading state. Renders the ApiKeyModal on
+// first visit or after a 401, and the two-panel chat+artifact UI once a key
+// is present.
+import { useState, useCallback, useRef } from 'react'
 import ApiKeyModal from './components/ApiKeyModal.jsx'
 import ChatThread from './components/ChatThread.jsx'
 import ChatInput from './components/ChatInput.jsx'
+import ArtifactTray from './components/ArtifactTray.jsx'
 import { sendChat } from './api.js'
 import styles from './App.module.css'
 
 export default function App() {
   const [groqKey, setGroqKey] = useState(() => localStorage.getItem('groq_key') || '')
   const [messages, setMessages] = useState([])
+  const [artifacts, setArtifacts] = useState([])
   const [loading, setLoading] = useState(false)
+  const artifactCounter = useRef(0)
 
   const handleKeySet = useCallback((key) => {
     localStorage.setItem('groq_key', key)
@@ -21,6 +25,11 @@ export default function App() {
   const handleClearKey = useCallback(() => {
     localStorage.removeItem('groq_key')
     setGroqKey('')
+  }, [])
+
+  const handleArtifactClick = useCallback((artifactId) => {
+    document.getElementById(`artifact-${artifactId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [])
 
   const handleSend = useCallback(async (text) => {
@@ -33,11 +42,23 @@ export default function App() {
 
     try {
       const data = await sendChat(text, history, groqKey)
+
+      let artifactId = null
+      if (data.figure || data.sql) {
+        artifactCounter.current += 1
+        artifactId = artifactCounter.current
+        setArtifacts(prev => [...prev, {
+          id: artifactId,
+          question: text,
+          figure: data.figure || null,
+          sql: data.sql || null,
+        }])
+      }
+
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: data.text,
-        figure: data.figure || null,
-        sql: data.sql || null,
+        artifactId,
       }])
     } catch (err) {
       if (err.message === 'invalid_key') {
@@ -67,8 +88,20 @@ export default function App() {
           API Key
         </button>
       </header>
-      <ChatThread messages={messages} loading={loading} />
-      <ChatInput onSend={handleSend} disabled={loading} />
+      <div className={styles.main}>
+        <div className={styles.chatPanel}>
+          <ChatThread
+            messages={messages}
+            loading={loading}
+            onSend={handleSend}
+            onArtifactClick={handleArtifactClick}
+          />
+          <ChatInput onSend={handleSend} disabled={loading} />
+        </div>
+        <div className={styles.artifactPanel}>
+          <ArtifactTray artifacts={artifacts} />
+        </div>
+      </div>
     </div>
   )
 }

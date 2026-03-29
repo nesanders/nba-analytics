@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -36,4 +36,35 @@
 .keyBtn:hover {
   border-color: var(--accent);
   color: var(--text);
+}
+
+/* Two-panel layout */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chatPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.artifactPanel {
+  width: 420px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* On narrow screens stack vertically */
+@media (max-width: 860px) {
+  .main { flex-direction: column; }
+  .chatPanel { border-right: none; border-bottom: 1px solid var(--border); }
+  .artifactPanel { width: 100%; height: 45vh; }
 }

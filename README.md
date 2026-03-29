@@ -40,7 +40,8 @@ FastAPI (Python)                          Google Cloud Run (scale-to-zero)
 | LLM API key | User supplies their own free Groq key; stored in `localStorage`, never on server |
 | Data queries | DuckDB reads Parquet files directly from GCS via httpfs (HMAC auth); no download at startup |
 | Text accuracy | Two-stage LLM: stage 1 generates SQL, stage 2 writes response text from actual results |
-| Chart rendering | Plotly.js, figure spec built server-side and passed as JSON |
+| SQL errors | Automatic retry with corrected prompt, up to 3 attempts |
+| Chart rendering | Plotly.js, figure spec built server-side and passed as JSON; charts/SQL shown in right-hand artifact tray |
 | Shot charts | Fetched on-demand from `stats.nba.com` via `nba_api`; not pre-cached |
 
 ---
@@ -51,8 +52,7 @@ FastAPI (Python)                          Google Cloud Run (scale-to-zero)
 2. Open the app and paste your key into the modal — it's saved in your browser only
 3. Ask any NBA statistics question in plain English
 
-The app shows the generated SQL below each response (click "Show SQL"). If a query fails
-the error is displayed inline so you can refine your question.
+Charts and SQL appear in the **artifact tray** on the right, numbered to match each response in the chat. Click "↗ Artifact #N" in a response to scroll to its chart. SQL is pretty-printed with word wrap. If a query fails the backend retries up to 3 times with a corrected prompt before reporting an error.
 
 ---
 
@@ -152,5 +152,5 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
       so the first request isn't slow
 - [ ] **Play-by-play aggregations** — pre-aggregate clutch stats, lineup stats, etc.
       into summary Parquet files so common queries don't scan all 13.5M rows
-- [ ] **Better SQL error recovery** — retry with a corrected prompt when SQL fails
+- [x] **Better SQL error recovery** — retry with corrected prompt, up to 3 attempts
 - [ ] **Rate limiting** — add basic rate limiting on the Cloud Run endpoint

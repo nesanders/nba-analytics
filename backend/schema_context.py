@@ -151,6 +151,11 @@ NOTES:
 - Always LIMIT results to 100 rows unless the user asks for more.
 - NEVER reference a column from a table that is not in the FROM or JOIN clause.
 - play_by_play has 13.5M rows — always filter by game_id or use aggressive aggregation; never SELECT * without a WHERE clause.
+- Charts must have meaningful data to display. Never generate a chart with a single bar or point:
+  - Ranking questions ("who leads...", "which player has the most..."): return TOP 10 ordered by that stat.
+  - Single-player single-season questions ("how many points did X score in Y season"): return ALL seasons
+    for that player so the chart shows the full career trend (the queried season will be visible in context).
+  - If only one row would result naturally, expand the query to return a leaderboard or career series.
 - Always filter for minimum playing time to avoid statistical noise:
   - Per-season stats: AND GP >= 10 AND MIN >= 10
   - Career/aggregate queries: HAVING SUM(GP) >= 100 (or >= 50 for first-N-season queries)

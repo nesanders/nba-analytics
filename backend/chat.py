@@ -31,6 +31,7 @@ router = APIRouter()
 MAX_HISTORY_TURNS = 10  # keep last N user+assistant pairs
 MAX_ROWS = 500          # hard cap on rows returned to chart builder
 SUMMARIZE_ROWS = 15     # rows shown to LLM for text generation
+MAX_SQL_RETRIES = 3     # max attempts to fix failing SQL before giving up
 
 
 class ChatMessage(BaseModel):
@@ -85,20 +86,37 @@ async def chat(
     sql = llm_response.get("sql")
     chart_spec = llm_response.get("chart")
 
-    # --- Execute SQL ---
+    # --- Execute SQL (with up to MAX_SQL_RETRIES attempts to fix errors) ---
     rows = []
     figure = None
     sql_error = None
     if sql:
-        sql = _sanitize_sql(sql)
         try:
-            rows = run_query(sql)
-            if len(rows) > MAX_ROWS:
-                rows = rows[:MAX_ROWS]
-            if chart_spec and chart_spec.get("type") and chart_spec["type"] != "null":
-                figure = build_figure(rows, chart_spec)
-        except Exception as e:
+            sql = _sanitize_sql(sql)
+        except ValueError as e:
             sql_error = str(e)
+
+        if not sql_error:
+            for attempt in range(MAX_SQL_RETRIES):
+                try:
+                    rows = run_query(sql)
+                    if len(rows) > MAX_ROWS:
+                        rows = rows[:MAX_ROWS]
+                    if chart_spec and chart_spec.get("type") and chart_spec["type"] != "null":
+                        figure = build_figure(rows, chart_spec)
+                    sql_error = None
+                    break
+                except Exception as e:
+                    sql_error = str(e)
+                    if attempt < MAX_SQL_RETRIES - 1:
+                        fixed = _retry_fix_sql(groq_client, req.message, sql, sql_error)
+                        if fixed:
+                            try:
+                                sql = _sanitize_sql(fixed)
+                            except ValueError:
+                                break  # fixed SQL contained forbidden keyword
+                        else:
+                            break  # LLM couldn't produce a fix
 
     # --- Stage 2: Generate text from actual query results ---
     if sql and not sql_error and rows:
@@ -146,6 +164,37 @@ def _generate_summary(
         top = rows[0]
         keys = list(top.keys())
         return f"Top result: {', '.join(f'{k}={top[k]}' for k in keys[:4])}"
+
+
+def _retry_fix_sql(
+    groq_client: Groq,
+    question: str,
+    failed_sql: str,
+    error: str,
+) -> str | None:
+    """Ask the LLM to fix a failing SQL query. Returns corrected SQL or None."""
+    prompt = (
+        f"The following DuckDB SQL query failed:\n\n{failed_sql}\n\n"
+        f"Error: {error}\n\n"
+        f"Original question: {question}\n\n"
+        "Return ONLY the corrected SQL — no JSON, no explanation, no code fences."
+    )
+    try:
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=512,
+        )
+        fixed = resp.choices[0].message.content.strip()
+        fixed = re.sub(r"^```(?:sql)?\s*", "", fixed)
+        fixed = re.sub(r"\s*```$", "", fixed)
+        return fixed.strip() or None
+    except Exception:
+        return None
 
 
 def _parse_llm_response(raw: str) -> dict[str, Any]:

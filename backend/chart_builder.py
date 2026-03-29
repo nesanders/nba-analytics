@@ -19,6 +19,69 @@ Rows = list[dict[str, Any]]
 PLOTLY_TEMPLATE = "plotly_dark"
 DEFAULT_HEIGHT = 420
 
+_LABEL_MAP = {
+    "PLAYER_NAME": "Player", "PLAYER_ID": "Player ID",
+    "TEAM_NAME": "Team", "TEAM_ABBREVIATION": "Team",
+    "season": "Season", "GAME_DATE": "Date",
+    "GP": "Games", "MIN": "Minutes",
+    "PTS": "Points", "FGM": "FG Made", "FGA": "FG Att.",
+    "FG_PCT": "FG%", "FG3M": "3P Made", "FG3A": "3P Att.", "FG3_PCT": "3PT%",
+    "FTM": "FT Made", "FTA": "FT Att.", "FT_PCT": "FT%",
+    "REB": "Rebounds", "OREB": "Off Reb", "DREB": "Def Reb",
+    "AST": "Assists", "STL": "Steals", "BLK": "Blocks",
+    "TOV": "Turnovers", "PF": "Fouls", "PLUS_MINUS": "+/-",
+    "NET_RATING": "Net Rating", "OFF_RATING": "Off Rating", "DEF_RATING": "Def Rating",
+    "E_NET_RATING": "Est. Net Rating",
+    "TS_PCT": "True Shooting %", "USG_PCT": "Usage %", "EFG_PCT": "eFG%",
+    "AST_PCT": "Assist %", "REB_PCT": "Reb %", "PIE": "PIE",
+    "W_PCT": "Win %", "W": "Wins", "L": "Losses",
+    "pts_per36": "Pts / 36 Min", "ast_per36": "Ast / 36 Min",
+    "reb_per36": "Reb / 36 Min", "blk_per36": "Blk / 36 Min",
+    "stl_per36": "Stl / 36 Min",
+    "avg_pts": "Avg Points", "avg_ast": "Avg Assists", "avg_reb": "Avg Rebounds",
+    "total_min": "Total Minutes", "total_pts": "Total Points",
+    "total_gp": "Total Games",
+}
+
+
+def _pretty_label(col: str | None) -> str:
+    """Convert a raw column name to a human-readable axis label."""
+    if not col:
+        return ""
+    if col in _LABEL_MAP:
+        return _LABEL_MAP[col]
+    return col.replace("_", " ").title()
+
+
+def _data_footnote(df: pd.DataFrame) -> str:
+    """
+    Build a short data-availability note for chart annotations.
+
+    If the dataframe has a 'season' column with YYYY-YY strings, derive the
+    actual range from the data.  Otherwise fall back to known source ranges.
+    """
+    import re
+    if "season" in df.columns:
+        seasons = df["season"].dropna().astype(str)
+        valid = [s for s in seasons if re.match(r"^\d{4}-\d{2}$", s)]
+        if valid:
+            first = min(valid)
+            last = max(valid)
+            end_year = int(last[:4]) + 1
+            return f"Data: {first[:4]}–{end_year} · Source: NBA Stats API / Kaggle"
+    # Fallback: player/team season stats coverage
+    return "Player/team season stats: 1996–2025 · Game records: 1946–2025 · Source: NBA Stats API / Kaggle"
+
+
+_FOOTNOTE_STYLE = dict(
+    xref="paper", yref="paper",
+    x=0.5, y=-0.12,
+    xanchor="center", yanchor="top",
+    text="",          # filled in per chart
+    showarrow=False,
+    font=dict(size=10, color="#666688"),
+)
+
 
 def build_figure(rows: Rows, spec: ChartSpec) -> dict | None:
     """Build a Plotly figure dict from query rows and LLM chart spec."""
@@ -52,14 +115,17 @@ def build_figure(rows: Rows, spec: ChartSpec) -> dict | None:
             return None
 
 
-def _layout(spec: ChartSpec, **overrides) -> dict:
+def _layout(spec: ChartSpec, df: pd.DataFrame | None = None, **overrides) -> dict:
+    y_spec = spec.get("y")
+    footnote = {**_FOOTNOTE_STYLE, "text": _data_footnote(df) if df is not None else ""}
     return {
         "title": {"text": spec.get("title", ""), "x": 0.5},
         "template": PLOTLY_TEMPLATE,
         "height": DEFAULT_HEIGHT,
-        "margin": {"l": 50, "r": 20, "t": 50, "b": 50},
-        "xaxis": {"title": spec.get("x", "")},
-        "yaxis": {"title": spec.get("y", "") if isinstance(spec.get("y"), str) else ""},
+        "margin": {"l": 50, "r": 20, "t": 50, "b": 70},
+        "xaxis": {"title": _pretty_label(spec.get("x") or "")},
+        "yaxis": {"title": _pretty_label(y_spec) if isinstance(y_spec, str) else ""},
+        "annotations": [footnote],
         **overrides,
     }
 
@@ -127,14 +193,15 @@ def _bar(df: pd.DataFrame, spec: ChartSpec) -> dict:
     if use_horizontal:
         n = len(df)
         height = max(DEFAULT_HEIGHT, 40 * n + 80)
-        layout = _layout(spec, barmode="group",
+        y_spec = spec.get("y")
+        layout = _layout(spec, df, barmode="group",
                          height=height,
-                         margin={"l": 160, "r": 20, "t": 50, "b": 40},
+                         margin={"l": 160, "r": 20, "t": 50, "b": 70},
                          yaxis={"title": "", "autorange": "reversed"},
-                         xaxis={"title": spec.get("y", "") if isinstance(spec.get("y"), str) else ""})
+                         xaxis={"title": _pretty_label(y_spec) if isinstance(y_spec, str) else ""})
     else:
-        layout = _layout(spec, barmode="group",
-                         xaxis={"title": spec.get("x", ""), "tickangle": -35,
+        layout = _layout(spec, df, barmode="group",
+                         xaxis={"title": _pretty_label(spec.get("x") or ""), "tickangle": -35,
                                  "automargin": True})
     return {"data": data, "layout": layout}
 
@@ -165,11 +232,11 @@ def _line(df: pd.DataFrame, spec: ChartSpec) -> dict:
     # Also set categoryorder so multi-series charts (where groupby produces
     # traces in alphabetical player order) don't append missing seasons to the
     # end of the axis instead of placing them chronologically.
-    xaxis_override = {"title": spec.get("x", "")}
+    xaxis_override = {"title": _pretty_label(spec.get("x") or "")}
     if x and _is_season_col(df[x]):
         xaxis_override["type"] = "category"
         xaxis_override["categoryorder"] = "category ascending"
-    return {"data": data, "layout": _layout(spec, xaxis=xaxis_override)}
+    return {"data": data, "layout": _layout(spec, df, xaxis=xaxis_override)}
 
 
 def _scatter(df: pd.DataFrame, spec: ChartSpec) -> dict:
@@ -189,7 +256,7 @@ def _scatter(df: pd.DataFrame, spec: ChartSpec) -> dict:
         if color_col and color_col in df.columns:
             trace["marker"] = {"color": df[color_col].tolist(), "showscale": True}
         data.append(trace)
-    return {"data": data, "layout": _layout(spec)}
+    return {"data": data, "layout": _layout(spec, df)}
 
 
 def _bubble(df: pd.DataFrame, spec: ChartSpec) -> dict:
@@ -209,7 +276,7 @@ def _bubble(df: pd.DataFrame, spec: ChartSpec) -> dict:
         if text_col:
             trace["text"] = df[text_col].tolist()
         data.append(trace)
-    return {"data": data, "layout": _layout(spec)}
+    return {"data": data, "layout": _layout(spec, df)}
 
 
 def _radar(df: pd.DataFrame, spec: ChartSpec) -> dict:
@@ -237,7 +304,7 @@ def _radar(df: pd.DataFrame, spec: ChartSpec) -> dict:
                 "type": "scatterpolar", "fill": "toself",
                 "name": y_col, "r": vals + [vals[0]], "theta": categories + [categories[0]],
             })
-    layout = _layout(spec)
+    layout = _layout(spec, df)
     layout["polar"] = {"radialaxis": {"visible": True}}
     return {"data": data, "layout": layout}
 
@@ -246,7 +313,7 @@ def _histogram(df: pd.DataFrame, spec: ChartSpec) -> dict:
     x, y_cols = _resolve_columns(df, spec)
     col = x or (y_cols[0] if y_cols else df.columns[0])
     data = [{"type": "histogram", "x": df[col].dropna().tolist(), "name": col}]
-    return {"data": data, "layout": _layout(spec)}
+    return {"data": data, "layout": _layout(spec, df)}
 
 
 def _box(df: pd.DataFrame, spec: ChartSpec) -> dict:
@@ -260,7 +327,7 @@ def _box(df: pd.DataFrame, spec: ChartSpec) -> dict:
     else:
         for y_col in y_cols:
             data.append({"type": "box", "name": y_col, "y": df[y_col].dropna().tolist()})
-    return {"data": data, "layout": _layout(spec)}
+    return {"data": data, "layout": _layout(spec, df)}
 
 
 def _pie(df: pd.DataFrame, spec: ChartSpec) -> dict:
@@ -268,7 +335,7 @@ def _pie(df: pd.DataFrame, spec: ChartSpec) -> dict:
     labels = df[x].tolist() if x else list(range(len(df)))
     values = df[y_cols[0]].tolist() if y_cols else [1] * len(df)
     data = [{"type": "pie", "labels": labels, "values": values, "textinfo": "label+percent"}]
-    layout = _layout(spec)
+    layout = _layout(spec, df)
     layout.pop("xaxis", None)
     layout.pop("yaxis", None)
     return {"data": data, "layout": layout}
@@ -292,7 +359,7 @@ def _heatmap(df: pd.DataFrame, spec: ChartSpec) -> dict:
         numeric = df.select_dtypes("number")
         data = [{"type": "heatmap", "z": numeric.values.tolist(),
                  "x": numeric.columns.tolist(), "colorscale": "RdYlGn"}]
-    layout = _layout(spec)
+    layout = _layout(spec, df)
     layout.pop("xaxis", None)
     layout.pop("yaxis", None)
     return {"data": data, "layout": layout}

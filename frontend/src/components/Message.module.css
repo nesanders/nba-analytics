@@ -6,7 +6,7 @@
 .assistant { justify-content: flex-start; }
 
 .bubble {
-  max-width: min(720px, 92%);
+  max-width: min(600px, 92%);
   border-radius: var(--radius);
   padding: 12px 16px;
   line-height: 1.6;
@@ -34,38 +34,20 @@
   word-break: break-word;
 }
 
-.chart {
-  margin-top: 12px;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.sqlSection {
+.artifactLink {
+  display: inline-block;
   margin-top: 10px;
-}
-
-.sqlToggle {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 5px;
-  color: var(--text-muted);
+  color: var(--accent);
   cursor: pointer;
   font-size: 0.75rem;
   padding: 3px 8px;
-  transition: color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.sqlToggle:hover { color: var(--text); }
-
-.sql {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: #a8d8a8;
-  font-family: monospace;
-  font-size: 0.8rem;
-  margin-top: 6px;
-  overflow-x: auto;
-  padding: 10px 12px;
-  white-space: pre;
+.artifactLink:hover {
+  border-color: var(--accent);
+  background: rgba(232, 93, 4, 0.08);
 }
