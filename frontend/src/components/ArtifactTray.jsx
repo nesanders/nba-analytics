@@ -1,14 +1,26 @@
 // Right-hand artifact tray. Shows charts and SQL produced by each assistant
-// response. Each card is numbered to match the badge shown in the chat bubble.
-// Clicking a card header opens a full-page overlay. Clicking an artifact link
-// in chat scrolls here, flashes the card, and opens the overlay.
-import { useState } from 'react'
+// response. Each card is collapsible; the newest card auto-expands when it arrives.
+// Clicking ⤢ on a card header opens the full-page overlay.
+// Clicking an artifact link in chat scrolls here, flashes the card, and opens the overlay.
+import { useState, useEffect } from 'react'
 import { format as formatSql } from 'sql-formatter'
 import PlotlyChart from './PlotlyChart.jsx'
 import styles from './ArtifactTray.module.css'
 
 export default function ArtifactTray({ artifacts, focusedArtifactId, highlightedArtifactId, onFocusChange }) {
+  const [expandedCardId, setExpandedCardId] = useState(null)
   const focusedArtifact = artifacts.find(a => a.id === focusedArtifactId) ?? null
+
+  // Auto-expand the newest artifact when it arrives; collapse all others
+  useEffect(() => {
+    if (artifacts.length > 0) {
+      setExpandedCardId(artifacts[artifacts.length - 1].id)
+    }
+  }, [artifacts.length])
+
+  const handleToggleExpand = (id) => {
+    setExpandedCardId(prev => (prev === id ? null : id))
+  }
 
   return (
     <>
@@ -29,6 +41,8 @@ export default function ArtifactTray({ artifacts, focusedArtifactId, highlighted
                 key={artifact.id}
                 artifact={artifact}
                 highlighted={artifact.id === highlightedArtifactId}
+                expanded={artifact.id === expandedCardId}
+                onToggleExpand={() => handleToggleExpand(artifact.id)}
                 onFocus={() => onFocusChange(artifact.id)}
               />
             ))}
@@ -57,23 +71,30 @@ export default function ArtifactTray({ artifacts, focusedArtifactId, highlighted
   )
 }
 
-function ArtifactCard({ artifact, highlighted, onFocus }) {
+function ArtifactCard({ artifact, highlighted, expanded, onToggleExpand, onFocus }) {
   return (
     <div
       id={`artifact-${artifact.id}`}
       className={`${styles.card} ${highlighted ? styles.highlighted : ''}`}
     >
-      <button className={styles.cardHeader} onClick={onFocus} title="Click to expand">
-        <span className={styles.badge}>#{artifact.id}</span>
-        <span className={styles.question}>{artifact.question}</span>
-        <span className={styles.expandHint}>⤢</span>
-      </button>
-      {artifact.figure && (
-        <div className={styles.chart}>
-          <PlotlyChart figure={artifact.figure} />
-        </div>
+      <div className={styles.cardHeader}>
+        <button className={styles.collapseBtn} onClick={onToggleExpand} title={expanded ? 'Collapse' : 'Expand'}>
+          <span className={styles.badge}>#{artifact.id}</span>
+          <span className={styles.collapseIcon}>{expanded ? '▾' : '▸'}</span>
+          <span className={styles.question}>{artifact.question}</span>
+        </button>
+        <button className={styles.expandBtn} onClick={onFocus} title="Open full view">⤢</button>
+      </div>
+      {expanded && (
+        <>
+          {artifact.figure && (
+            <div className={styles.chart}>
+              <PlotlyChart figure={artifact.figure} />
+            </div>
+          )}
+          {artifact.sql && <SqlBlock sql={artifact.sql} />}
+        </>
       )}
-      {artifact.sql && <SqlBlock sql={artifact.sql} />}
     </div>
   )
 }

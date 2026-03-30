@@ -139,6 +139,21 @@ FROM player_season_stats
 GROUP BY PLAYER_NAME HAVING SUM(GP) >= 100
 ORDER BY pts_per36 DESC LIMIT 10
 
+DATA LIMITATIONS — acknowledge these when a question touches pre-1996 history or missing stats:
+- **player_season_stats, player_season_stats_advanced, team stats, player_game_logs**:
+  cover **1996-97 to present only**. No data exists for players/teams before that era —
+  Wilt Chamberlain, Bill Russell, Magic Johnson, Larry Bird, etc. are not in these tables.
+  Always caveat "since 1996-97" when drawing on these tables.
+- **game (team box scores)**: goes back to 1946, but:
+  • blocks (blk_home/away) and steals (stl_home/away) were **not tracked until 1973-74** —
+    these columns are NULL/0 for games before that season.
+  • 3-point field goals (fg3m, fg3a, fg3_pct) **did not exist until 1979-80** — NULL/0 before.
+  • Offensive rebounds tracked separately starting ~1973-74; earlier values may be 0.
+- **shot charts**: available only via stats.nba.com, roughly 1996-97 onward.
+- **play_by_play**: 1946-present, but event text for very early games may be sparse.
+- When asked about "all-time" or "NBA history" records using player_season_stats,
+  explicitly note the 1996-97 cutoff and that historical greats are excluded.
+
 NOTES:
 - player_season_stats and player_season_stats_advanced use column names in UPPERCASE.
 - game table uses lowercase column names.

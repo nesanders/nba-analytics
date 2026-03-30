@@ -90,20 +90,33 @@
 .cardHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
   background: var(--surface2);
-  width: 100%;
+  border-bottom: 1px solid var(--border);
+}
+
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
   text-align: left;
   cursor: pointer;
-  border-radius: 0;
   font-family: var(--font);
   transition: background 0.15s;
 }
 
-.cardHeader:hover {
+.collapseBtn:hover {
   background: var(--border);
+}
+
+.collapseIcon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .badge {
@@ -122,11 +135,23 @@
   flex: 1;
 }
 
-.expandHint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.expandBtn {
   flex-shrink: 0;
-  opacity: 0.5;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  transition: color 0.15s, background 0.15s;
+  font-family: var(--font);
+  line-height: 1;
+}
+
+.expandBtn:hover {
+  color: var(--text);
+  background: var(--border);
 }
 
 .chart {

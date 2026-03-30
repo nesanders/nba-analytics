@@ -94,14 +94,17 @@ export default function App() {
 
   if (!auth) return <ApiKeyModal onKeySet={handleKeySet} />
 
-  const providerLabel = auth.provider === 'gemini' ? 'Gemini' : 'Groq'
+  const providerLabel = auth.provider === 'gemini' ? 'Gemini 2.5 Flash' : 'Groq'
 
   return (
     <div className={styles.app}>
       <header className={styles.header}>
-        <span className={styles.logo}>🏀 NBA Analytics</span>
-        <button className={styles.keyBtn} onClick={handleClearKey} title="Change provider / key">
-          {providerLabel} ·  Change
+        <span className={styles.logo}>
+          <img src="/logo.svg" alt="" style={{ height: '28px', verticalAlign: 'middle', marginRight: '8px' }} />
+          NBA Analytics
+        </span>
+        <button className={styles.keyBtn} onClick={handleClearKey} title="Switch LLM provider or change API key">
+          ⚙ {providerLabel} · Change
         </button>
       </header>
       <div className={styles.main}>

@@ -33,7 +33,17 @@ export default function ApiKeyModal({ onKeySet }) {
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h1 className={styles.title}>🏀 NBA Analytics</h1>
+        <div className={styles.logoRow}>
+          <img src="/logo.svg" alt="NBA Analytics" className={styles.logo} />
+          <div>
+            <h1 className={styles.title}>NBA Analytics</h1>
+            <p className={styles.tagline}>
+              Ask plain-English questions about NBA stats — get instant charts
+              and SQL powered by AI, using play-by-play and box score data from
+              1946 and player stats from 1996–97 to present.
+            </p>
+          </div>
+        </div>
 
         <div className={styles.tabs}>
           <button
@@ -48,7 +58,7 @@ export default function ApiKeyModal({ onKeySet }) {
             onClick={() => handleProviderChange('gemini')}
             type="button"
           >
-            Gemini
+            Gemini 2.5 Flash
           </button>
         </div>
 
@@ -63,8 +73,10 @@ export default function ApiKeyModal({ onKeySet }) {
           </p>
         ) : (
           <p className={styles.desc}>
-            Enter the Gemini access token to use Gemini 2.0 Flash via the
-            server-side API key. The token is stored only in your browser.
+            Enter the Gemini access token to use Gemini 2.5 Flash via the
+            server-side API key. Access is available{' '}
+            <strong>by request from the app author</strong>. The token is stored
+            only in your browser.
           </p>
         )}
 

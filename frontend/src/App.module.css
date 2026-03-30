@@ -24,18 +24,19 @@
 
 .keyBtn {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  border: 1px solid var(--accent);
+  color: var(--accent);
   font-size: 0.8rem;
-  padding: 4px 10px;
+  font-weight: 600;
+  padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .keyBtn:hover {
-  border-color: var(--accent);
-  color: var(--text);
+  background: var(--accent);
+  color: white;
 }
 
 /* Two-panel layout */

@@ -20,14 +20,15 @@ AI-generated SQL queries and inline Plotly visualizations.
 ```
 Browser (React + Vite + Plotly.js)        GitHub Pages
     │  POST /chat  {message, history}
-    │  X-Groq-Key: <user's key>
+    │  X-Groq-Key: <user's key>  OR  X-Gemini-Token: <operator token>
     ▼
 FastAPI (Python)                          Google Cloud Run (scale-to-zero)
-    │  ├── calls Groq API (llama-3.3-70b) forwarding user's key
+    │  ├── Groq API (llama-3.3-70b) — user-supplied key forwarded at request time
+    │  ├── Gemini 2.5 Flash — server-held key, gated by GEMINI_AUTH_TOKEN env var
     │  ├── executes SQL via DuckDB
     │  └── builds Plotly figure spec
     │
-    ├── DuckDB                            reads Parquet files downloaded at startup
+    ├── DuckDB                            reads Parquet files from GCS via httpfs at query time
     └── Google Cloud Storage             Parquet files (~18 MB, 17 tables)
          ▲
     Cloud Run Job + Cloud Scheduler      daily updater (nba_api → GCS)
@@ -37,28 +38,39 @@ FastAPI (Python)                          Google Cloud Run (scale-to-zero)
 
 | Concern | Decision |
 |---|---|
-| LLM API key | User supplies their own free Groq key; stored in `localStorage`, never on server |
+| LLM provider | Groq (user-supplied free key) or Gemini 2.5 Flash (server-side key, by request) |
+| LLM API key | Groq key stays in `localStorage`, never stored on server. Gemini key is server-only. |
 | Data queries | DuckDB reads Parquet files directly from GCS via httpfs (HMAC auth); no download at startup |
 | Text accuracy | Two-stage LLM: stage 1 generates SQL, stage 2 writes response text from actual results |
 | SQL errors | Automatic retry with corrected prompt, up to 3 attempts |
 | Chart rendering | Plotly.js, figure spec built server-side and passed as JSON; charts/SQL shown in right-hand artifact tray |
 | Shot charts | Fetched on-demand from `stats.nba.com` via `nba_api`; not pre-cached |
+| Rate limiting | 20 req/min on `/chat`, 10 req/min on `/shot_chart` (per IP, via slowapi) |
 
 ---
 
 ## Using the app
 
-1. Get a free Groq API key at [console.groq.com](https://console.groq.com/keys)
-2. Open the app and paste your key into the modal — it's saved in your browser only
-3. Ask any NBA statistics question in plain English
+### Groq (free, no account required on our end)
 
-Charts and SQL appear in the **artifact tray** on the right, numbered to match each response in the chat. Click "↗ Artifact #N" in a response to scroll to its chart. SQL is pretty-printed with word wrap. If a query fails the backend retries up to 3 times with a corrected prompt before reporting an error.
+1. Get a free Groq API key at [console.groq.com](https://console.groq.com/keys)
+2. Open the app — click the **⚙ Change** button in the top-right at any time to switch providers or update your key
+3. Select **Groq** and paste your key — it's saved in your browser only, never sent to our servers
+4. Ask any NBA statistics question in plain English
+
+### Gemini 2.5 Flash
+
+1. Select the **Gemini 2.5 Flash** tab in the modal
+2. Enter the access token (available by request from the app author)
+3. The actual Gemini API key is server-side and never exposed
+
+Charts and SQL appear in the **artifact tray** on the right, numbered to match each response.
+Click **⤢** on a card to open a full-screen view. Click **▸/▾** to collapse/expand cards.
+Click "↗ Artifact #N" links in responses to scroll to and highlight a chart.
 
 ---
 
 ## Data
-
-Data comes from two sources:
 
 | Source | Tables | Coverage |
 |---|---|---|
@@ -72,21 +84,22 @@ The daily Cloud Scheduler job refreshes the current season's stats after each ga
 
 ## Known limitations
 
-- **Pre-1996 player stats not available.** The NBA Stats API (`stats.nba.com`) only
-  provides `LeagueDashPlayerStats` from 1996-97 onward. Questions like "highest per-36
-  scoring average in league history" will miss Wilt Chamberlain, Oscar Robertson, etc.
-  Fixing this requires scraping Basketball Reference.
+- **Pre-1996 player stats not available.** The NBA Stats API only provides player/team
+  per-game stats from 1996-97 onward. Questions about Wilt Chamberlain, Oscar Robertson,
+  Magic Johnson, Larry Bird, etc. will return no results from those tables.
 
-- **Player game logs cover 1996-97 to present.** Full game-by-game logs for all
-  players are available from the NBA Stats API era. Pre-1996 game logs are not available.
+- **Blocks and steals not tracked before 1973-74.** The `game` table goes back to 1946,
+  but `blk_home/away` and `stl_home/away` are NULL/0 for earlier seasons.
+
+- **3-point line introduced 1979-80.** `fg3m`, `fg3a`, `fg3_pct` columns are 0/NULL
+  for games before that season in the `game` table.
 
 - **Shot charts are on-demand, not cached.** The `/shot_chart` endpoint calls
   `stats.nba.com` in real time. If the NBA API is slow or rate-limits the request,
   shot chart queries will be slow or fail.
 
 - **Play-by-play queries can be slow.** The table has 13.5M rows read via httpfs from
-  GCS. The LLM is instructed to always filter by `game_id`; open-ended aggregations
-  over the full table will be slow.
+  GCS. Always filter by `game_id`; open-ended aggregations over the full table will be slow.
 
 - **LLM SQL accuracy.** Complex multi-table queries or ambiguous questions may produce
   incorrect SQL. The generated SQL is always shown so you can verify it.
@@ -106,11 +119,9 @@ The daily Cloud Scheduler job refreshes the current season's stats after each ga
 ```bash
 conda activate nba-analytics
 
-# Point at local Parquet files instead of GCS
 export LOCAL_PARQUET_DIR=./data/parquet
 export GCS_BUCKET_NAME=<your-bucket>
 export ALLOWED_ORIGIN=http://localhost:5173
-export GROQ_API_KEY=gsk_...      # optional, for local curl testing only
 
 cd backend
 uvicorn main:app --reload --port 8080
@@ -147,10 +158,7 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
 ## TODO
 
 - [ ] **Pre-1996 player stats** — scrape Basketball Reference for full historical coverage
-- [x] **Historical player game logs** — all seasons 1996-97 to present loaded
 - [ ] **Shot chart caching** — pre-fetch and store popular player/season shot data in GCS
       so the first request isn't slow
 - [ ] **Play-by-play aggregations** — pre-aggregate clutch stats, lineup stats, etc.
       into summary Parquet files so common queries don't scan all 13.5M rows
-- [x] **Better SQL error recovery** — retry with corrected prompt, up to 3 attempts
-- [ ] **Rate limiting** — add basic rate limiting on the Cloud Run endpoint
