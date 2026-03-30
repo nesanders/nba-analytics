@@ -125,15 +125,21 @@ async def chat(
     )
 
 
+def _round_row(row: dict) -> dict:
+    """Round floats to 3 decimal places so the LLM doesn't quote 10-digit precision."""
+    return {k: round(v, 3) if isinstance(v, float) else v for k, v in row.items()}
+
+
 def _generate_summary(client, question: str, rows: list[dict]) -> str:
     """Second LLM call: generate text grounded in actual query results."""
-    sample = rows[:SUMMARIZE_ROWS]
+    sample = [_round_row(r) for r in rows[:SUMMARIZE_ROWS]]
     results_text = json.dumps(sample, default=str, indent=None)
     prompt = (
         f"The user asked: {question}\n\n"
         f"The database returned these results (first {len(sample)} rows):\n{results_text}\n\n"
         "Write a concise 1-3 sentence answer grounded in these exact results. "
         "Name specific players/teams/numbers from the data. Do not guess or use outside knowledge. "
+        "Round numbers to a natural precision (e.g. 24.3 ppg, not 24.312). "
         "Return plain text only, no JSON."
     )
     try:
