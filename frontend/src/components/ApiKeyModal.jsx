@@ -34,7 +34,7 @@ export default function ApiKeyModal({ onKeySet }) {
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <div className={styles.logoRow}>
-          <img src="/logo.svg" alt="NBA Analytics" className={styles.logo} />
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="NBA Analytics" className={styles.logo} />
           <div>
             <h1 className={styles.title}>NBA Analytics</h1>
             <p className={styles.tagline}>

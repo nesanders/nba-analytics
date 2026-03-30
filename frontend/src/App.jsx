@@ -100,7 +100,7 @@ export default function App() {
     <div className={styles.app}>
       <header className={styles.header}>
         <span className={styles.logo}>
-          <img src="/logo.svg" alt="" style={{ height: '28px', verticalAlign: 'middle', marginRight: '8px' }} />
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" style={{ height: '28px', verticalAlign: 'middle', marginRight: '8px' }} />
           NBA Analytics
         </span>
         <button className={styles.keyBtn} onClick={handleClearKey} title="Switch LLM provider or change API key">
