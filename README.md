@@ -70,15 +70,47 @@ Click "↗ Artifact #N" links in responses to scroll to and highlight a chart.
 
 ---
 
-## Data
+## Data coverage
 
-| Source | Tables | Coverage |
+### Tables updated automatically (Cloud Scheduler daily/weekly)
+
+| Table | Source | Historical start | Current season |
+|---|---|---|---|
+| `player_season_stats` | nba_api | **1996-97** | ✅ Current |
+| `player_season_stats_advanced` | nba_api | **1996-97** | ✅ Current |
+| `team_season_stats` | nba_api | **1996-97** | ✅ Current |
+| `team_season_stats_advanced` | nba_api | **1996-97** | ✅ Current |
+| `player_game_logs` | nba_api | **1996-97** | ✅ Current |
+
+### Tables from static Kaggle snapshot (wyattowalsh/basketball, ~early 2023)
+
+These were loaded once at init time and are **never refreshed** by the updater.
+
+| Table | Historical start | Stale since |
 |---|---|---|
-| [wyattowalsh/basketball](https://www.kaggle.com/datasets/wyattowalsh/basketball) (Kaggle) | `game`, `player`, `common_player_info`, `draft_history`, `line_score`, `other_stats`, `game_info`, `game_summary`, `team`, `officials`, `play_by_play`, `inactive_players` | Team box scores and play-by-play 1946–present; player metadata |
-| NBA Stats API (`nba_api`) | `player_season_stats`, `player_season_stats_advanced`, `team_season_stats`, `team_season_stats_advanced`, `player_game_logs` | **1996-97 to present only** |
+| `game` (team box scores) | 1946-47 | ⚠️ ~early 2023 |
+| `play_by_play` | ~1946 | ⚠️ ~early 2023 |
+| `line_score` | ~1946 | ⚠️ ~early 2023 |
+| `game_summary` | ~1946 | ⚠️ ~early 2023 |
+| `game_info`, `other_stats` | ~1946 | ⚠️ ~early 2023 |
+| `officials` | ~1946 | ⚠️ ~early 2023 |
+| `common_player_info` | All-time | ⚠️ ~early 2023 |
+| `draft_history` | 1947 | ⚠️ ~2022 draft |
+| `player`, `team` | All-time | ⚠️ ~early 2023 |
 
-The daily Cloud Scheduler job refreshes the current season's stats after each game day
-(Oct–Jun) and weekly during the off-season (Jul–Sep).
+### Historical stat-tracking gaps in the `game` table
+
+Even for seasons it does cover, the `game` table reflects what was tracked at the time:
+
+| Stat | Available from |
+|---|---|
+| Points, FG, FT | 1946-47 |
+| Rebounds (total) | 1950-51 |
+| Assists | 1946-47 |
+| Offensive/defensive rebounds (split) | ~1973-74 |
+| Blocks, steals | **1973-74** |
+| 3-point field goals | **1979-80** |
+| Advanced stats (TS%, eFG%, etc.) | **1996-97** (nba_api only) |
 
 ---
 
@@ -157,8 +189,33 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
 
 ## TODO
 
-- [ ] **Pre-1996 player stats** — scrape Basketball Reference for full historical coverage
-- [ ] **Shot chart caching** — pre-fetch and store popular player/season shot data in GCS
-      so the first request isn't slow
-- [ ] **Play-by-play aggregations** — pre-aggregate clutch stats, lineup stats, etc.
-      into summary Parquet files so common queries don't scan all 13.5M rows
+### Data freshness (Kaggle snapshot tables are stale since ~early 2023)
+
+- [ ] **`game` table updater** — highest priority; team box scores post-2023 are missing.
+      Add `update_game_table()` to `updater/update_data.py` using `LeagueGameLog` from
+      nba_api; pivot the long (one-row-per-team) format into the wide home/away schema.
+- [ ] **`common_player_info` refresh** — player bios, birthdates, and draft info are stale.
+      Used for age-matched queries and position filtering. Refreshable via nba_api
+      `CommonPlayerInfo` or `PlayerIndex`.
+- [ ] **`draft_history` refresh** — missing 2023+ draft classes. Fetchable via nba_api
+      `DraftHistory`.
+- [ ] **`line_score`, `game_summary`, `officials` refresh** — quarter scores and game
+      metadata are stale. These can be fetched per game_id from nba_api after updating
+      the `game` table.
+- [ ] **`play_by_play` incremental update** — 13.5M rows makes a full re-load impractical.
+      Would need per-game-id fetching via nba_api `PlayByPlayV2`, then append + dedup.
+
+### Historical coverage gaps
+
+- [ ] **Pre-1996 player stats** — NBA Stats API only goes back to 1996-97. Full historical
+      player per-game stats (Bird, Magic, Wilt, etc.) would require scraping Basketball
+      Reference. Large effort; no clean API exists.
+- [ ] **Pre-1973 blocks/steals in `game` table** — these stats weren't tracked before
+      1973-74; no data source exists to backfill them.
+
+### Performance
+
+- [ ] **Shot chart caching** — pre-fetch popular player/season shot data in GCS so the
+      first request isn't slow (currently hits stats.nba.com on-demand).
+- [ ] **Play-by-play pre-aggregations** — clutch stats, lineup stats, etc. as summary
+      Parquet files to avoid full 13.5M-row scans.
