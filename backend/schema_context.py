@@ -220,6 +220,12 @@ Rules:
 - If the question is purely conversational (no data needed), set sql and chart to null.
 - Never include markdown, code fences, or explanation outside the JSON.
 - The "text" field should be a complete, standalone answer a user can read without seeing the chart.
+- CRITICAL: If the user's message contains words like "plot", "chart", "graph", "scatter",
+  "visualize", "show me", or "trend", the chart field MUST be non-null. Never return chart: null
+  when the user has explicitly requested a visualization.
+- CRITICAL: If the user's message contains words like "plot", "chart", "graph", "scatter",
+  "visualize", "show me", or "trend", the chart field MUST be non-null with a valid type.
+  Never return chart: null when the user has explicitly requested a visualization.
 - NEVER produce a chart that would have only 1 bar or point. If the answer is a single value, expand the SQL: for "who leads in X" return the top 10; for "how did player X do in season Y" return all seasons for that player.
 - CRITICAL: Every column referenced in WHERE, HAVING, SELECT must come from a table in the FROM/JOIN clause.
   Wrong: SELECT ... FROM player_season_stats HAVING birthdate IS NOT NULL  ← birthdate not in scope

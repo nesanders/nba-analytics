@@ -92,8 +92,6 @@ async def chat(
                     rows = run_query(sql)
                     if len(rows) > MAX_ROWS:
                         rows = rows[:MAX_ROWS]
-                    if chart_spec and chart_spec.get("type") and chart_spec["type"] != "null":
-                        figure = build_figure(rows, chart_spec)
                     sql_error = None
                     break
                 except Exception as e:
@@ -107,6 +105,13 @@ async def chat(
                                 break
                         else:
                             break
+
+        # Build figure separately — chart errors must not trigger SQL retry
+        if not sql_error and rows and chart_spec and chart_spec.get("type") and chart_spec["type"] != "null":
+            try:
+                figure = build_figure(rows, chart_spec)
+            except Exception as e:
+                figure = None  # chart build failed; SQL + text still returned
 
     # --- Stage 2: Generate text from actual query results ---
     if sql and not sql_error and rows:
