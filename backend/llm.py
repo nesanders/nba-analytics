@@ -151,6 +151,12 @@ class GeminiClient(_LLMClient):
         }
         if json_mode:
             config_kwargs["response_mime_type"] = "application/json"
+            # Disable thinking for structured JSON calls — reasoning isn't needed
+            # and thinking tokens count against max_output_tokens, causing truncation.
+            try:
+                config_kwargs["thinking_config"] = self._types.ThinkingConfig(thinking_budget=0)
+            except AttributeError:
+                pass  # SDK version doesn't support ThinkingConfig
         if system_instruction:
             config_kwargs["system_instruction"] = system_instruction
 

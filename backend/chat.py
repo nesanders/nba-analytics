@@ -11,7 +11,7 @@ Two-stage LLM flow:
 
 Two providers are supported, selected by request header:
   X-Groq-Key:     user-supplied Groq key  → llama-3.3-70b-versatile (free tier)
-  X-Gemini-Token: server-side auth token  → gemini-2.0-flash (operator-paid)
+  X-Gemini-Token: server-side auth token  → gemini-2.5-flash (operator-paid)
 """
 import json
 import os
@@ -140,7 +140,7 @@ def _generate_summary(client, question: str, rows: list[dict]) -> str:
         return client.complete(
             [{"role": "user", "content": prompt}],
             json_mode=False,
-            max_tokens=256,
+            max_tokens=512,
         ).strip()
     except Exception:
         top = rows[0]
