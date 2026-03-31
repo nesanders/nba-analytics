@@ -1,0 +1,86 @@
+name: Deploy Updater Job
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/updater/**'
+      - '.github/workflows/deploy-updater.yml'
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nba-analytics/updater
+  JOB: nba-analytics-updater
+  # 8 AM UTC = ~4 AM ET — after all overnight NBA games have finished
+  SCHEDULE: "0 8 * * *"
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build and push Docker image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            ./backend/updater
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Create or update Cloud Run Job
+        run: |
+          gcloud run jobs create ${{ env.JOB }} \
+            --image=${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --task-count=1 \
+            --max-retries=1 \
+            --memory=2Gi \
+            --cpu=1 \
+            --task-timeout=1800s \
+            --service-account=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --set-env-vars="GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}" \
+          2>/dev/null \
+          || gcloud run jobs update ${{ env.JOB }} \
+            --image=${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --task-count=1 \
+            --max-retries=1 \
+            --memory=2Gi \
+            --cpu=1 \
+            --task-timeout=1800s \
+            --service-account=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --set-env-vars="GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}"
+
+      - name: Create or update Cloud Scheduler job
+        run: |
+          gcloud scheduler jobs create http nba-analytics-daily-update \
+            --location=${{ env.REGION }} \
+            --schedule="${{ env.SCHEDULE }}" \
+            --time-zone="UTC" \
+            --uri="https://run.googleapis.com/v2/projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/jobs/${{ env.JOB }}:run" \
+            --message-body="{}" \
+            --oidc-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --oidc-token-audience="https://run.googleapis.com/" \
+          2>/dev/null \
+          || gcloud scheduler jobs update http nba-analytics-daily-update \
+            --location=${{ env.REGION }} \
+            --schedule="${{ env.SCHEDULE }}" \
+            --time-zone="UTC" \
+            --uri="https://run.googleapis.com/v2/projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/jobs/${{ env.JOB }}:run" \
+            --message-body="{}" \
+            --oidc-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --oidc-token-audience="https://run.googleapis.com/"

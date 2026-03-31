@@ -81,22 +81,22 @@ Click "↗ Artifact #N" links in responses to scroll to and highlight a chart.
 | `team_season_stats` | nba_api | **1996-97** | ✅ Current |
 | `team_season_stats_advanced` | nba_api | **1996-97** | ✅ Current |
 | `player_game_logs` | nba_api | **1996-97** | ✅ Current |
+| `game` (team box scores) | nba_api LeagueGameLog | 1946-47 (Kaggle) | ✅ Current |
+| `common_player_info` | nba_api PlayerIndex + CommonPlayerInfo | All-time | ✅ Current |
+| `draft_history` | nba_api DraftHistory | 1947 | ✅ Current (last 3 drafts) |
+| `line_score` | nba_api BoxScoreSummaryV2 | ~1946 (Kaggle) | ✅ Current |
+| `game_summary` | nba_api BoxScoreSummaryV2 | ~1946 (Kaggle) | ✅ Current |
+| `officials` | nba_api BoxScoreSummaryV2 | ~1946 (Kaggle) | ✅ Current |
+| `play_by_play` | nba_api PlayByPlayV2 (opt-in) | ~1946 (Kaggle) | ✅ Current (with `--include-pbp`) |
 
 ### Tables from static Kaggle snapshot (wyattowalsh/basketball, ~early 2023)
 
 These were loaded once at init time and are **never refreshed** by the updater.
 
-| Table | Historical start | Stale since |
+| Table | Historical start | Notes |
 |---|---|---|
-| `game` (team box scores) | 1946-47 | ⚠️ ~early 2023 |
-| `play_by_play` | ~1946 | ⚠️ ~early 2023 |
-| `line_score` | ~1946 | ⚠️ ~early 2023 |
-| `game_summary` | ~1946 | ⚠️ ~early 2023 |
-| `game_info`, `other_stats` | ~1946 | ⚠️ ~early 2023 |
-| `officials` | ~1946 | ⚠️ ~early 2023 |
-| `common_player_info` | All-time | ⚠️ ~early 2023 |
-| `draft_history` | 1947 | ⚠️ ~2022 draft |
-| `player`, `team` | All-time | ⚠️ ~early 2023 |
+| `game_info`, `other_stats` | ~1946 | Low-priority; no nba_api equivalent in updater yet |
+| `player`, `team` | All-time | Reference tables; rarely change |
 
 ### Historical stat-tracking gaps in the `game` table
 
@@ -189,21 +189,47 @@ python scripts/init_gcs.py --bucket <your-gcs-bucket>
 
 ## TODO
 
-### Data freshness (Kaggle snapshot tables are stale since ~early 2023)
+### Infrastructure
 
-- [ ] **`game` table updater** — highest priority; team box scores post-2023 are missing.
-      Add `update_game_table()` to `updater/update_data.py` using `LeagueGameLog` from
-      nba_api; pivot the long (one-row-per-team) format into the wide home/away schema.
-- [ ] **`common_player_info` refresh** — player bios, birthdates, and draft info are stale.
-      Used for age-matched queries and position filtering. Refreshable via nba_api
-      `CommonPlayerInfo` or `PlayerIndex`.
-- [ ] **`draft_history` refresh** — missing 2023+ draft classes. Fetchable via nba_api
-      `DraftHistory`.
-- [ ] **`line_score`, `game_summary`, `officials` refresh** — quarter scores and game
-      metadata are stale. These can be fetched per game_id from nba_api after updating
-      the `game` table.
-- [ ] **`play_by_play` incremental update** — 13.5M rows makes a full re-load impractical.
-      Would need per-game-id fetching via nba_api `PlayByPlayV2`, then append + dedup.
+- [x] **Deploy Cloud Run Job for updater** — `deploy-updater.yml` builds
+      `backend/updater/` as a separate lightweight image, creates/updates the
+      `nba-analytics-updater` Cloud Run Job, and creates/updates the
+      `nba-analytics-daily-update` Cloud Scheduler job (runs at 08:00 UTC daily).
+      Triggers automatically on push to `main` when `backend/updater/**` changes.
+
+      **One-time IAM setup required** (run once, not in the workflow):
+      ```bash
+      # Allow the scheduler to invoke the Cloud Run Job
+      gcloud projects add-iam-policy-binding $PROJECT \
+        --member="serviceAccount:nba-analytics-backend@$PROJECT.iam.gserviceaccount.com" \
+        --role="roles/run.invoker"
+
+      # Allow the deploy SA to manage Cloud Scheduler
+      gcloud projects add-iam-policy-binding $PROJECT \
+        --member="serviceAccount:<deploy-sa>@$PROJECT.iam.gserviceaccount.com" \
+        --role="roles/cloudscheduler.admin"
+
+      # Enable Cloud Scheduler API if not already enabled
+      gcloud services enable cloudscheduler.googleapis.com
+      ```
+
+- [ ] **One-time catch-up** — run `scripts/catchup_stale_tables.py` locally to backfill
+      2022-23, 2023-24, and 2024-25 game/line_score/game_summary/officials data.
+      Add `--include-pbp` separately (~1 hr) for play-by-play.
+
+### Data freshness
+
+- [x] **`game` table updater** — `update_game_table()` in `updater/update_data.py` using
+      `LeagueGameLog`; pivots long (one-row-per-team) format to wide home/away schema.
+- [x] **`common_player_info` refresh** — `update_common_player_info()` uses `PlayerIndex`
+      for bulk roster/team refresh + `CommonPlayerInfo` per-call for new players (birthdates).
+- [x] **`draft_history` refresh** — `update_draft_history()` fetches recent draft seasons
+      via `DraftHistory`; defaults to last 3 years.
+- [x] **`line_score`, `game_summary`, `officials` refresh** — `update_game_details()` calls
+      `BoxScoreSummaryV2` for all new game_ids found in the game table.
+- [x] **`play_by_play` incremental update** — `update_play_by_play()` fetches `PlayByPlayV2`
+      per new game_id. Excluded from default daily run (downloads ~500 MB); enable with
+      `--include-pbp`. Use large `--days-back` for initial catch-up (slow: ~0.6s/game).
 
 ### Historical coverage gaps
 

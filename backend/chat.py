@@ -70,7 +70,7 @@ async def chat(
         messages.append({"role": msg.role, "content": msg.content})
     messages.append({"role": "user", "content": req.message})
 
-    raw = client.complete(messages, json_mode=True, max_tokens=1024)
+    raw = client.complete(messages, json_mode=True, max_tokens=2048)
     llm_response = _parse_llm_response(raw)
     fallback_text = llm_response.get("text", "")
     sql = llm_response.get("sql")
