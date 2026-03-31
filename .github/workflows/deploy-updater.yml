@@ -46,7 +46,7 @@ jobs:
           gcloud run jobs create ${{ env.JOB }} \
             --image=${{ env.IMAGE }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
-                        --max-retries=1 \
+            --max-retries=1 \
             --memory=2Gi \
             --cpu=1 \
             --task-timeout=1800s \
@@ -56,12 +56,17 @@ jobs:
           || gcloud run jobs update ${{ env.JOB }} \
             --image=${{ env.IMAGE }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
-                        --max-retries=1 \
+            --max-retries=1 \
             --memory=2Gi \
             --cpu=1 \
             --task-timeout=1800s \
             --service-account=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars="GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}"
+
+      - name: Pause old schedulers (nba-data-updater is superseded)
+        run: |
+          gcloud scheduler jobs pause nba-updater-daily --location=${{ env.REGION }} 2>/dev/null || true
+          gcloud scheduler jobs pause nba-updater-weekly --location=${{ env.REGION }} 2>/dev/null || true
 
       - name: Create or update Cloud Scheduler job
         run: |

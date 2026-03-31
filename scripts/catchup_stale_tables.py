@@ -56,6 +56,7 @@ from update_data import (
     upload_parquet,
     update_common_player_info,
     update_draft_history,
+    NBA_HEADERS,
 )
 
 load_dotenv()
@@ -129,6 +130,7 @@ def catchup_game_table(bucket: storage.Bucket) -> None:
                 logs = leaguegamelog.LeagueGameLog(
                     season=season,
                     season_type_all_star=season_type,
+                    headers=NBA_HEADERS,
                     timeout=120,
                 )
                 df = logs.get_data_frames()[0]
@@ -203,7 +205,7 @@ def catchup_game_details(bucket: storage.Bucket) -> None:
 
     for i, gid in enumerate(missing_ids):
         try:
-            summary = boxscoresummaryv2.BoxScoreSummaryV2(game_id=gid, timeout=30)
+            summary = boxscoresummaryv2.BoxScoreSummaryV2(game_id=gid, headers=NBA_HEADERS, timeout=30)
             dfs = summary.get_data_frames()
             # Index 0: GameSummary, 2: Officials, 5: LineScore
             if len(dfs) > 5 and not dfs[5].empty:
@@ -280,7 +282,7 @@ def catchup_play_by_play(bucket: storage.Bucket) -> None:
     new_rows = []
     for i, gid in enumerate(missing_ids):
         try:
-            pbp = playbyplayv2.PlayByPlayV2(game_id=gid, timeout=60)
+            pbp = playbyplayv2.PlayByPlayV2(game_id=gid, headers=NBA_HEADERS, timeout=60)
             df = pbp.get_data_frames()[0]
             if not df.empty:
                 new_rows.append(df)

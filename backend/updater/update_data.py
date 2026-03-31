@@ -35,6 +35,21 @@ load_dotenv()
 
 GCS_BUCKET = os.getenv("GCS_BUCKET_NAME", "nba-analytics-data-2026")
 
+# stats.nba.com requires browser-like headers or it drops/times out requests.
+NBA_HEADERS = {
+    "Host": "stats.nba.com",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token": "true",
+    "Connection": "keep-alive",
+    "Referer": "https://stats.nba.com/",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+}
+
 # Stat columns in LeagueGameLog that map directly to the game table
 _GAME_STAT_COLS = [
     "PTS", "FGM", "FGA", "FG_PCT", "FG3M", "FG3A", "FG3_PCT",
@@ -89,6 +104,7 @@ def update_player_game_logs(bucket: storage.Bucket, season: str, days_back: int)
         logs = playergamelogs.PlayerGameLogs(
             season_nullable=season,
             date_from_nullable=date_from,
+            headers=NBA_HEADERS,
             timeout=120,
         )
         new_df = logs.get_data_frames()[0]
@@ -130,6 +146,7 @@ def update_player_season_stats(bucket: storage.Bucket, season: str) -> None:
                 season=season,
                 measure_type_detailed_defense=measure_type,
                 per_mode_detailed="PerGame",
+                headers=NBA_HEADERS,
                 timeout=60,
             )
             new_df = stats.get_data_frames()[0]
@@ -162,6 +179,7 @@ def update_team_season_stats(bucket: storage.Bucket, season: str) -> None:
                 season=season,
                 measure_type_detailed_defense=measure_type,
                 per_mode_detailed="PerGame",
+                headers=NBA_HEADERS,
                 timeout=60,
             )
             new_df = stats.get_data_frames()[0]
@@ -245,6 +263,7 @@ def update_game_table(bucket: storage.Bucket, season: str, days_back: int) -> No
                 season=season,
                 season_type_all_star=season_type,
                 date_from_nullable=date_from,
+                headers=NBA_HEADERS,
                 timeout=120,
             )
             df = logs.get_data_frames()[0]
@@ -289,7 +308,7 @@ def update_common_player_info(bucket: storage.Bucket) -> None:
 
     print("  Fetching PlayerIndex...")
     try:
-        idx = playerindex.PlayerIndex(timeout=60)
+        idx = playerindex.PlayerIndex(headers=NBA_HEADERS, timeout=60)
         idx_df = idx.get_data_frames()[0]
     except Exception as e:
         print(f"  ERROR fetching PlayerIndex: {e}", file=sys.stderr)
@@ -337,7 +356,7 @@ def update_common_player_info(bucket: storage.Bucket) -> None:
     new_rows = []
     for i, pid in enumerate(sorted(new_ids)):
         try:
-            info = commonplayerinfo.CommonPlayerInfo(player_id=pid, timeout=30)
+            info = commonplayerinfo.CommonPlayerInfo(player_id=pid, headers=NBA_HEADERS, timeout=30)
             row = info.get_data_frames()[0].iloc[0]
             new_rows.append(row.to_dict())
         except Exception as e:
@@ -401,7 +420,7 @@ def update_draft_history(bucket: storage.Bucket, seasons: list[int] | None = Non
         season_s = str(year)
         print(f"  Fetching draft history for {season_s}...")
         try:
-            dh = drafthistory.DraftHistory(season_year_nullable=season_s, timeout=60)
+            dh = drafthistory.DraftHistory(season_year_nullable=season_s, headers=NBA_HEADERS, timeout=60)
             df = dh.get_data_frames()[0]
             if not df.empty:
                 new_rows.append(df)
@@ -461,7 +480,7 @@ def update_game_details(bucket: storage.Bucket, days_back: int) -> None:
 
     for i, gid in enumerate(game_ids):
         try:
-            summary = boxscoresummaryv2.BoxScoreSummaryV2(game_id=gid, timeout=30)
+            summary = boxscoresummaryv2.BoxScoreSummaryV2(game_id=gid, headers=NBA_HEADERS, timeout=30)
             dfs = summary.get_data_frames()
             # Result set indices (BoxScoreSummaryV2):
             #   0: GameSummary, 1: OtherStats, 2: Officials, 3: InactivePlayers,
@@ -546,7 +565,7 @@ def update_play_by_play(bucket: storage.Bucket, days_back: int) -> None:
     new_rows = []
     for i, gid in enumerate(missing_ids):
         try:
-            pbp = playbyplayv2.PlayByPlayV2(game_id=gid, timeout=60)
+            pbp = playbyplayv2.PlayByPlayV2(game_id=gid, headers=NBA_HEADERS, timeout=60)
             df = pbp.get_data_frames()[0]
             if not df.empty:
                 new_rows.append(df)
