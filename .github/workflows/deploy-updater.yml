@@ -76,8 +76,8 @@ jobs:
             --time-zone="UTC" \
             --uri="https://run.googleapis.com/v2/projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/jobs/${{ env.JOB }}:run" \
             --message-body="{}" \
-            --oidc-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
-            --oidc-token-audience="https://run.googleapis.com/" \
+            --oauth-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform \
           2>/dev/null \
           || gcloud scheduler jobs update http nba-analytics-daily-update \
             --location=${{ env.REGION }} \
@@ -85,5 +85,5 @@ jobs:
             --time-zone="UTC" \
             --uri="https://run.googleapis.com/v2/projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/jobs/${{ env.JOB }}:run" \
             --message-body="{}" \
-            --oidc-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
-            --oidc-token-audience="https://run.googleapis.com/"
+            --oauth-service-account-email=nba-analytics-backend@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
